@@ -39,6 +39,23 @@ td.l,th.l{text-align:left}
 #login{max-width:360px;margin:60px auto}
 #login .card{text-align:center}
 #login input{width:100%;margin:10px 0;text-align:center}
+.view{background:none;border:1.5px solid var(--line);color:var(--brand);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;padding:3px 8px;margin-right:4px}
+.modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:80;overflow:auto;padding:24px}
+.modal.show{display:block}
+.modalbox{max-width:760px;margin:0 auto;background:#fff;border-radius:14px;padding:20px;position:relative;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.modalclose{position:absolute;top:8px;right:12px;border:none;background:none;font-size:26px;cursor:pointer;color:var(--muted);line-height:1}
+.dsec{margin:14px 0}
+.dsec h3{font-size:14px;margin:0 0 6px;color:var(--brand);border-bottom:2px solid var(--line);padding-bottom:4px}
+.dmeta{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:6px}
+.dmeta b{color:var(--brand2)}
+.dcat{font-weight:800;font-size:12.5px;background:#f1f5f9;padding:4px 8px;margin-top:8px;border-radius:6px}
+.ditem{display:flex;justify-content:space-between;gap:10px;padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:13px}
+.ditem .dq{flex:1;text-align:left}
+.dv{font-weight:700;white-space:nowrap}
+.dv.done{color:var(--done)}.dv.fail{color:var(--fail)}.dv.partial{color:#d97706}.dv.na{color:#64748b}.dv.idle{color:#94a3b8}
+.dcard{border:1.5px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;font-size:13px;text-align:left}
+.dcard .t{font-weight:800;color:var(--brand)}
+.dempty{color:var(--muted);font-size:13px;padding:6px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:99}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
@@ -89,10 +106,17 @@ td.l,th.l{text-align:left}
   </div>
 </div>
 
+<div id="detailModal" class="modal" onclick="if(event.target===this)closeDetail()">
+  <div class="modalbox">
+    <button class="modalclose" onclick="closeDetail()">×</button>
+    <div id="detailBody"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
 const POS_ORDER={運營:1,小編:2,群控:3};
+let subsById={};
 function $(id){return document.getElementById(id);}
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800);}
 function thisMonth(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
@@ -132,6 +156,7 @@ function renderSummary(sum){
 }
 function renderDetail(subs){
   const t=$("detTbl");
+  subsById={}; subs.forEach(s=>subsById[s.id]=s);
   if(!subs.length){t.innerHTML="<tr><td class='empty'>本月尚無填答</td></tr>";return;}
   let h="<tr><th>日期</th><th>崗位</th><th class='l'>姓名</th><th>IP</th><th>完成率</th><th>數字達標</th><th>互助</th><th>扣分</th><th class='l'>未完成/部分項目</th><th></th></tr>";
   subs.forEach(s=>{
@@ -141,15 +166,33 @@ function renderDetail(subs){
        "<td>"+(m.numTot?m.numOk+'/'+m.numTot:'—')+"</td><td>"+(m.helpCount||0)+"</td>"+
        "<td class='"+(m.dedTotal<0?'ded':'')+"'>"+(m.dedTotal||'')+"</td>"+
        "<td class='fails'>"+esc((s.fails||[]).join('、'))+"</td>"+
-       "<td><button class='del' onclick=\"del('"+s.id+"')\">刪除</button></td></tr>";
+       "<td style='white-space:nowrap'><button class='view' onclick=\"openDetail('"+s.id+"')\">詳情</button><button class='del' onclick=\"del('"+s.id+"')\">刪除</button></td></tr>";
   });
   t.innerHTML=h;
 }
 async function del(id){
-  if(!confirm("確定刪除這筆填答？"))return;
+  if(!confirm("確定刪除這筆填答？刪除後該同事才能重新送出當日回報。"))return;
   await fetch('/api/admin/submission?id='+encodeURIComponent(id),{method:'DELETE'});
-  toast("已刪除");load();
+  toast("已刪除");closeDetail();load();
 }
+function openDetail(id){
+  const s=subsById[id]; if(!s)return; const m=s.metrics||{};
+  let h="<h2 style='margin:0 0 10px;font-size:17px'>填答詳情</h2>";
+  h+="<div class='dmeta'><span>崗位：<b>"+esc(s.pos)+"</b></span><span>姓名：<b>"+esc(s.name)+"</b></span><span>IP：<b>"+esc(s.ip||'')+"</b></span><span>日期：<b>"+esc(s.date)+"</b></span><span>"+(s.live?'直播日':'非直播日')+"</span></div>";
+  h+="<div class='dmeta'><span>完成率：<b>"+(m.denom>0?m.rate+'%':'—')+"</b></span><span>數字達標："+(m.numTot?m.numOk+'/'+m.numTot:'—')+"</span><span>互助："+(m.helpCount||0)+" 件</span><span>扣分："+(m.dedTotal||0)+"</span><span style='color:var(--muted)'>送出："+esc((s.receivedAt||'').replace('T',' ').slice(0,16))+"</span></div>";
+  h+="<div class='dsec'><h3>第一部分　每日工作勾選</h3>";
+  if(s.lines&&s.lines.length){var lastSec=null;s.lines.forEach(function(ln){if(ln.sec!==lastSec){h+="<div class='dcat'>"+esc(ln.sec)+"</div>";lastSec=ln.sec;}var cls=ln.v==='完成'?'done':ln.v==='未完成'?'fail':ln.v==='部分'?'partial':ln.v==='不適用'?'na':ln.v==='未填'?'idle':(ln.v.indexOf('✓')>=0?'done':ln.v.indexOf('✗')>=0?'fail':'idle');h+="<div class='ditem'><span class='dq'>"+esc(ln.q)+"</span><span class='dv "+cls+"'>"+esc(ln.v)+"</span></div>";});}
+  else{h+="<div class='ditem'><span class='dq'>未完成/部分項目</span><span>"+esc((s.fails||[]).join('、')||'（無）')+"</span></div>";if((s.nums||[]).length)h+="<div class='ditem'><span class='dq'>數字項</span><span>"+esc(s.nums.join('、'))+"</span></div>";h+="<div class='dempty'>（此筆為舊版資料，無逐項明細）</div>";}
+  h+="</div>";
+  h+="<div class='dsec'><h3>第二部分　互助事蹟</h3>";
+  if((s.helps||[]).length){s.helps.forEach(function(x){h+="<div class='dcard'><div class='t'>"+esc(x.type||'')+"</div>"+(x.who?"<div>對象/教學："+esc(x.who)+"</div>":"")+(x.content?"<div>內容："+esc(x.content)+"</div>":"")+(x.result?"<div>完成度/成效："+esc(x.result)+"</div>":"")+"</div>";});}else{h+="<div class='dempty'>（無）</div>";}
+  h+="</div>";
+  h+="<div class='dsec'><h3>第三部分　主管扣分</h3>";
+  if((s.deds||[]).length){s.deds.forEach(function(x){h+="<div class='dcard'><div class='t' style='color:var(--fail)'>"+esc(x.item||'')+"　"+(x.pts!=null?x.pts:'')+"</div>"+(x.reason?"<div>原因："+esc(x.reason)+"</div>":"")+"</div>";});}else{h+="<div class='dempty'>（無）</div>";}
+  h+="</div>";
+  $("detailBody").innerHTML=h; $("detailModal").classList.add("show");
+}
+function closeDetail(){$("detailModal").classList.remove("show");}
 function exportCsv(){const m=$("fMonth").value;window.location='/api/admin/export?month='+encodeURIComponent(m);}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 

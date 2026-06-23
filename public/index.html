@@ -444,9 +444,10 @@ function buildPayload(){
  syncInputs();var c=calc();var items=DATA[S.pos];
  var fails=[];items.forEach(function(it,i){if(it[3]==="c"&&(S.items[i]==="fail"||S.items[i]==="partial"))fails.push(it[1].slice(0,18)+(S.items[i]==="partial"?"(部分)":""));});
  var nums=[];items.forEach(function(it,i){if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){var thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+":"+S.items[i]+((thr<=0||Number(S.items[i])>=thr)?"✓":"✗"));}});
+ var lines=items.map(function(it,i){var v;if(it[3]==="c"){v=({done:"完成",partial:"部分",fail:"未完成",na:"不適用"})[S.items[i]]||"未填";}else{var x=S.items[i];if(x==null||x===""){v="未填";}else{var thr=it[4][S.ip];v=x+((thr<=0||Number(x)>=thr)?" ✓達標":" ✗未達標");}}return {sec:it[0],q:it[1],v:v,t:it[3]};});
  return {pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,helps:S.helps,deds:S.deds,
    metrics:{rate:c.rate,done:c.done,denom:c.denom,numOk:c.nOk,numTot:c.nTot,helpCount:S.helps.length,dedTotal:ded()},
-   fails:fails,nums:nums};
+   fails:fails,nums:nums,lines:lines};
 }
 async function submitServer(){
  syncInputs();
@@ -455,7 +456,8 @@ async function submitServer(){
  try{
   var r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
   var j=await r.json();
-  if(j.ok){save();toast(j.updated?"已更新今日回報 ✓":"已送出到主管後台 ✓");}
+  if(j.ok){save();toast("已送出到主管後台 ✓（送出後即鎖定，主管統一管理）");}
+  else if(j.locked){alert("⚠ "+j.error);}
   else{toast("送出失敗："+(j.error||"請重試"));}
  }catch(e){save();toast("無法連線後台，已暫存本機（稍後再送）");}
 }

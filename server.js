@@ -101,20 +101,21 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const pn = u.pathname;
   try {
-    // 填寫者送出（同人同日覆蓋）
+    // 填寫者送出（送出即鎖定：同人同日只能送一次，之後由主管後台統一管理）
     if (pn === '/api/submit' && req.method === 'POST') {
       const b = await readBody(req);
       if (!b.pos || !b.name || !b.date) return send(res, 400, { error: '缺少必要欄位（崗位/姓名/日期）' });
       const existing = await db.execute({ sql: 'SELECT id FROM submissions WHERE name=? AND pos=? AND date=?', args: [b.name, b.pos, b.date] });
-      const updated = existing.rows.length > 0;
-      const id = updated ? existing.rows[0].id : (Date.now().toString(36) + crypto.randomBytes(3).toString('hex'));
+      if (existing.rows.length > 0) {
+        return send(res, 409, { error: b.name + '（' + b.pos + '）' + b.date + ' 的回報已送出並鎖定，由主管後台統一管理。如需修改，請聯繫主管。', locked: true });
+      }
+      const id = Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
       const receivedAt = new Date().toISOString();
       await db.execute({
-        sql: `INSERT INTO submissions (id,pos,name,date,payload,received_at) VALUES (?,?,?,?,?,?)
-              ON CONFLICT(name,pos,date) DO UPDATE SET payload=excluded.payload, received_at=excluded.received_at`,
+        sql: 'INSERT INTO submissions (id,pos,name,date,payload,received_at) VALUES (?,?,?,?,?,?)',
         args: [id, b.pos, b.name, b.date, JSON.stringify(b), receivedAt]
       });
-      return send(res, 200, { ok: true, id, updated });
+      return send(res, 200, { ok: true, id });
     }
 
     // 主管登入 / 狀態 / 登出
