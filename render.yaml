@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: live-daily-report
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: TZ=Asia/Taipei node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

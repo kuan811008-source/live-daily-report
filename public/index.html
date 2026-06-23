@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>直播團隊每日回報表</title>
+<style>
+:root{
+  --bg:#0f172a; --panel:#ffffff; --ink:#1e293b; --muted:#64748b; --line:#e2e8f0;
+  --brand:#1f6b6b; --brand2:#2f759c; --accent:#0ea5e9;
+  --done:#16a34a; --doneBg:#dcfce7; --partial:#d97706; --partialBg:#fef3c7;
+  --fail:#dc2626; --failBg:#fee2e2; --na:#64748b; --naBg:#e2e8f0;
+  --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.06);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;background:#f1f5f9;color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
+.wrap{max-width:860px;margin:0 auto;padding:0 14px 120px}
+header.top{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:18px 16px;border-radius:0 0 18px 18px;box-shadow:var(--shadow)}
+header.top h1{margin:0;font-size:20px;letter-spacing:.5px}
+header.top p{margin:4px 0 0;font-size:12.5px;opacity:.9}
+.card{background:var(--panel);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin:14px 0}
+.card h2{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card h2 .tag{font-size:11px;font-weight:600;color:#fff;background:var(--brand);border-radius:999px;padding:2px 9px}
+.grid{display:grid;gap:12px}
+.grid.meta{grid-template-columns:1fr 1fr}
+label.fld{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600}
+input[type=text],input[type=date],input[type=number],textarea,select{
+  font:inherit;font-size:14px;color:var(--ink);background:#f8fafc;border:1.5px solid var(--line);
+  border-radius:10px;padding:9px 11px;width:100%;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);background:#fff}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:13px;font-weight:600;border:1.5px solid var(--line);background:#fff;color:var(--muted);
+  border-radius:999px;padding:7px 13px;cursor:pointer;transition:.12s;flex:0 0 auto}
+.seg button.on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:var(--shadow)}
+.seg.ip button.on{background:var(--brand2);border-color:var(--brand2)}
+.chk{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer;user-select:none}
+.chk input{width:18px;height:18px;accent-color:var(--brand)}
+
+/* sticky summary */
+.summary{position:sticky;top:8px;z-index:30;background:#fff;border-radius:var(--radius);box-shadow:0 4px 14px rgba(15,23,42,.12);
+  padding:12px 14px;margin:14px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ring{--p:0;width:58px;height:58px;border-radius:50%;flex:0 0 auto;
+  background:conic-gradient(var(--done) calc(var(--p)*1%), #eef2f7 0);display:grid;place-items:center;position:relative}
+.ring::before{content:"";position:absolute;inset:6px;background:#fff;border-radius:50%}
+.ring b{position:relative;font-size:15px;font-weight:800;color:var(--brand)}
+.sumstats{display:flex;gap:16px;flex-wrap:wrap;flex:1}
+.stat{display:flex;flex-direction:column}
+.stat .v{font-size:18px;font-weight:800;line-height:1.1}
+.stat .k{font-size:11px;color:var(--muted);font-weight:600}
+.stat.neg .v{color:var(--fail)}
+.sumact{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:inherit;font-size:13px;font-weight:700;border:none;border-radius:10px;padding:9px 13px;cursor:pointer;transition:.12s;display:inline-flex;align-items:center;gap:6px}
+.btn.brand{background:var(--brand);color:#fff}
+.btn.soft{background:#eef2f7;color:var(--ink)}
+.btn.ghost{background:#fff;color:var(--brand);border:1.5px solid var(--line)}
+.btn:active{transform:translateY(1px)}
+
+/* sections / items */
+.sec{border:1.5px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden}
+.sec>.head{display:flex;align-items:center;gap:10px;padding:11px 13px;background:#f8fafc;cursor:pointer}
+.sec>.head .ttl{font-size:13.5px;font-weight:800;flex:1}
+.sec>.head .mini{font-size:11px;color:var(--muted);font-weight:700}
+.sec>.head .chev{transition:.2s;color:var(--muted)}
+.sec.col>.head .chev{transform:rotate(-90deg)}
+.sec.col>.body{display:none}
+.item{padding:11px 13px;border-top:1px solid var(--line)}
+.item .q{font-size:13.5px;font-weight:600;margin-bottom:3px}
+.item .std{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+.item .std b{color:var(--brand2)}
+.statebtns{display:flex;gap:6px;flex-wrap:wrap}
+.statebtns button{font:inherit;font-size:12.5px;font-weight:700;border:1.5px solid var(--line);background:#fff;color:var(--muted);
+  border-radius:9px;padding:6px 11px;cursor:pointer;transition:.12s}
+.statebtns button.done.on{background:var(--doneBg);border-color:var(--done);color:var(--done)}
+.statebtns button.partial.on{background:var(--partialBg);border-color:var(--partial);color:var(--partial)}
+.statebtns button.fail.on{background:var(--failBg);border-color:var(--fail);color:var(--fail)}
+.statebtns button.na.on{background:var(--naBg);border-color:var(--na);color:var(--na)}
+.numrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.numrow input{max-width:140px}
+.badge{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px}
+.badge.ok{background:var(--doneBg);color:var(--done)}
+.badge.no{background:var(--failBg);color:var(--fail)}
+.badge.idle{background:var(--naBg);color:var(--na)}
+.secact{padding:9px 13px;border-top:1px dashed var(--line);text-align:right}
+.secact button{font:inherit;font-size:12px;font-weight:700;color:var(--brand);background:none;border:none;cursor:pointer}
+
+/* repeatable cards (互助 / 扣分) */
+.entry{border:1.5px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;position:relative;background:#fcfdff}
+.entry .del{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--fail);font-size:18px;cursor:pointer;line-height:1}
+.entry .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{font-size:11.5px;color:var(--muted);background:#f8fafc;border-left:3px solid var(--brand2);padding:7px 10px;border-radius:0 8px 8px 0;margin:6px 0 10px}
+.sup-lock{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--brand);padding:4px 0}
+.histtbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+.histtbl th,.histtbl td{border:1px solid var(--line);padding:6px 8px;text-align:center}
+.histtbl th{background:#f1f5f9}
+.roll{display:flex;gap:14px;flex-wrap:wrap;background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:12px;padding:12px;margin-top:10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+  padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.foot{text-align:center;font-size:11px;color:var(--muted);margin-top:10px}
+@media (max-width:540px){.grid.meta{grid-template-columns:1fr}.entry .row2{grid-template-columns:1fr}}
+@media print{
+  body{background:#fff}.summary,.sumact,.secact,.btn,.actbar,.sup-lock .btn,details.hist,header.top .sub{box-shadow:none}
+  .no-print{display:none !important}.card,.sec{box-shadow:none;border-color:#ccc}.sec.col>.body{display:block !important}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>直播團隊每日回報表</h1>
+  <p class="sub">運營 ／ 小編 ／ 群控 · 每日填寫送出 · 主管後台自動彙整接月度考核</p>
+</header>
+
+<div class="wrap">
+  <!-- META -->
+  <div class="card">
+    <h2><span class="tag">基本</span>填寫人資訊</h2>
+    <div class="grid meta">
+      <label class="fld">崗位
+        <div class="seg" id="posSeg"></div>
+      </label>
+      <label class="fld">IP（決定數字門檻）
+        <div class="seg ip" id="ipSeg"></div>
+      </label>
+      <label class="fld">姓名 <input type="text" id="name" placeholder="你的名字"></label>
+      <label class="fld">日期 <input type="date" id="date"></label>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:18px;flex-wrap:wrap">
+      <label class="chk"><input type="checkbox" id="liveDay" checked>今天是直播日</label>
+      <span style="font-size:11.5px;color:var(--muted);align-self:center">非直播日的純直播項目，請選「不適用」</span>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary no-print">
+    <div class="ring" id="ring"><b id="ringTxt">0%</b></div>
+    <div class="sumstats">
+      <div class="stat"><span class="v" id="sDone">0/0</span><span class="k">勾選完成</span></div>
+      <div class="stat"><span class="v" id="sNum">0/0</span><span class="k">數字達標</span></div>
+      <div class="stat"><span class="v" id="sHelp">0</span><span class="k">互助事蹟</span></div>
+      <div class="stat neg"><span class="v" id="sDed">0</span><span class="k">主管扣分</span></div>
+    </div>
+    <div class="sumact">
+      <button class="btn soft" id="btnAllDone">全部完成</button>
+      <button class="btn ghost" id="btnClear">清空今日</button>
+    </div>
+  </div>
+
+  <!-- PART 1 -->
+  <div class="card">
+    <h2><span class="tag">第一部分</span>每日工作勾選</h2>
+    <div id="checklist"></div>
+  </div>
+
+  <!-- PART 2 -->
+  <div class="card">
+    <h2><span class="tag">第二部分</span>新人＆舊人 互助事蹟</h2>
+    <div class="hint">核心目標：①積極提醒並協助同事準時完成 ②直播後覆盤並提出改善 ③維持良好跨部門合作與溝通。當天有事蹟才填，可簡答或詳答。</div>
+    <div id="helps"></div>
+    <button class="btn ghost no-print" id="btnAddHelp">＋ 新增互助事蹟</button>
+  </div>
+
+  <!-- PART 3 -->
+  <div class="card">
+    <h2><span class="tag">第三部分</span>主管扣分</h2>
+    <div class="hint">本區由主管填寫。每違反一項 −3，單月上限 −30；觸犯紀律紅線另依考核辦法（封頂40＋人評會）。</div>
+    <div class="sup-lock no-print" id="supLock">
+      <button class="btn soft" id="btnSup">🔒 主管開啟扣分區</button>
+      <span style="font-size:11.5px;color:var(--muted)">（避免填寫者誤改）</span>
+    </div>
+    <div id="supArea" style="display:none">
+      <div id="deds"></div>
+      <button class="btn ghost no-print" id="btnAddDed">＋ 新增扣分紀錄</button>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="card actbar no-print">
+    <h2><span class="tag">完成</span>儲存與匯出</h2>
+    <div style="display:flex;gap:9px;flex-wrap:wrap">
+      <button class="btn brand" id="btnSubmit">📤 送出到主管後台</button>
+      <button class="btn soft" id="btnSave">💾 暫存到此裝置</button>
+      <button class="btn soft" id="btnCopy">📋 複製摘要（貼 LINE）</button>
+      <button class="btn soft" id="btnPrint">🖨️ 列印 / 存 PDF</button>
+      <button class="btn ghost" id="btnJson">⬇️ 下載 JSON</button>
+      <button class="btn ghost" id="btnLoad">⬆️ 載入 JSON</button>
+      <input type="file" id="fileIn" accept="application/json" style="display:none">
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="card">
+    <details class="hist">
+      <summary>📚 本機歷史紀錄與當月彙總（接考核）</summary>
+      <div class="roll" id="roll"></div>
+      <table class="histtbl" id="histTbl"></table>
+      <div class="foot">歷史僅存在此瀏覽器（localStorage）。換裝置請用「下載 JSON」備份。</div>
+    </details>
+  </div>
+
+  <div class="foot">直播團隊每日回報表 · 單檔離線版 · 完成率＝（完成＋0.5×部分）÷（勾選項−不適用）</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============== DATA ============== */
+const IPS=["微糖","白姊","棠棠"];
+const POS=["運營","小編","群控"];
+// item: {cat, q, std, type:'c'|'n', thr:{微糖,白姊,棠棠}}
+const DATA={
+"運營":[
+ ["一、排期與規劃","每月15/30日前完成下兩週直播排期，登記雲端審核表並通知小前審核","15·30日前","c"],
+ ["二、開播前準備","商品價格對標(蝦皮/momo/酷澎/PCHOME)，確認價差並截圖存團隊記事本","確認價差","c"],
+ ["二、開播前準備","完成≥1支商品表演實測(含彩排/道具)，確保不翻車","≥1支","c"],
+ ["二、開播前準備","QA整理完整，開播前提供廠商並更新QA文件","開播前","c"],
+ ["三、直播執行","白板資訊與主播一致(關鍵字/效期/原價/+1套數/產地/重點/購物車/規則)","八要素","c"],
+ ["三、直播執行","過標快場次多備白板或改用OBS呈現當標資訊，後台同步","後台同步","c"],
+ ["四、內容更新與行銷","直播預告彈跳視窗/活動內容準時更新且正確","微糖六18:00·白姊二18:00","c"],
+ ["四、內容更新與行銷","限動/私群/FB/IG/TK預告準時更新且正確","微糖日18:00·白姊三18:00","c"],
+ ["四、內容更新與行銷","種草/預熱影片：新品/大檔/海外場開播前7天≥1支(限動+私群+專區)","前7天≥1支","c"],
+ ["四、內容更新與行銷","影片/限動置入吃穿用且符合行銷規範(稀缺/賣點/對比/實測/背書/恐怖/價差)","符合規範","c"],
+ ["五、設備管理","出國前/直播前完成設備清點，不因設備造成播出中斷","不中斷","c"],
+ ["六、團隊管理","每日查核小編/群控完成度與正確度，直播前確認細節到位","每日","c"],
+ ["六、團隊管理","主管交辦事項均按要求完成","—","c"],
+ ["七、資源投入規範","活動金額＝結單×3%，用於引流/抽獎/福利並依規投放","3%","c"],
+ ["七、資源投入規範","活動贈送額度二擇一(滿額禮/大組)，依贈品成本貨盤表","二擇一","c"],
+ ["七、資源投入規範","廣告投放照規範(一般5%/特殊10%/國際10%)，不自行加減碼","5%/10%","c"]
+],
+"小編":[
+ ["一、開播前準備","直播資訊置頂五項全到(今日鉤子/VIP私群/領100/24H火箭/購物車)","五項","c"],
+ ["一、開播前準備","17:00前提交購物車名稱/商城公告/粉專網址審核，17:30前設定完成(收單後刪)","17:00/17:30","c"],
+ ["二、直播日節奏","炒群依IP完成(種草/預告/互動/開箱/受惠)","微糖17:00·白姊5則","c"],
+ ["二、直播日節奏","18:00開播通知：Line社群+官方Line+FB/IG/TK同步發出","18:00同步","c"],
+ ["二、直播日節奏","限量/賠本/重點標搖人訊息，圖文簡單暴力鉤子且不重複","不重複","c"],
+ ["二、直播日節奏","限動則數(FB/IG)達標","則數","n",{"微糖":10,"白姊":5,"棠棠":0}],
+ ["三、下播後彙整","開標商品資訊彙整+回放確認七項(圖/規/價/效/庫/贈品標/抽獎標)","七項","c"],
+ ["三、下播後彙整","客服注意事項彙整(單場/單標/贈品標/抽獎標)","—","c"],
+ ["三、下播後彙整","刷愛心群回報當日營業額(場次/日期/品類/購物車)","—","c"],
+ ["四、數據回報","數據回報範本完整(收單隔天：喊單/加單/結單/棄單/結單率/單品/訂單/新客/客單價)","隔天","c"],
+ ["五、社群與客服","各平台訊息當日清空(直播日清至下播後1小時)","META/TK/LINE/社群","c"],
+ ["五、社群與客服","主管交辦事項均按要求完成","—","c"]
+],
+"群控":[
+ ["一、留言互動標準","留言數達標(前台+後台)","則數","n",{"微糖":11000,"白姊":2500,"棠棠":0}],
+ ["一、留言互動標準","下播後1小時內提交前台+後台留言截圖佐證","1小時內","c"],
+ ["一、留言互動標準","直播當下FB/IG限動則數達標","則數","n",{"微糖":10,"白姊":5,"棠棠":0}],
+ ["二、內容規範","群控內容涵蓋八要素(用法/時間/效果/功效/案例/前後對比/搶購/背書)，禁洗版","八要素","c"],
+ ["三、巡查與客服","多平台公告/自介/客服電話時間定期更新(FB/IG/TH/TK/LINE/社群)","定期","c"],
+ ["三、巡查與客服","貼文負面/攻擊留言02:00前刪除，並引導客服至LINE與電話","02:00前","c"],
+ ["三、巡查與客服","各平台訊息當日清空(直播日清至下播後1小時)","—","c"],
+ ["四、下播後回報","下播後10分鐘內提交前台+後台截圖至指定位置","10分鐘內","c"],
+ ["四、下播後回報","主管交辦事項均按要求完成","—","c"],
+ ["五、發貼文規範","每篇貼文前完成反饋留言則數，多元不重複","則數","n",{"微糖":50,"白姊":10,"棠棠":0}],
+ ["五、發貼文規範","貼文依排程發佈","微糖一三15:30/白姊依排程","c"],
+ ["五、發貼文規範","發佈後將反饋留言+貼文網址提供指定LINE群","—","c"],
+ ["五、發貼文規範","連結放留言區不直接掛貼文(VIP私群/領100/24H火箭)","留言區","c"]
+]
+};
+const HELP_TYPES=["①現場補位","②突發救場","③帶人育才","④跨部門協調","⑤直播後覆盤"];
+const HELP_HINT={
+ "①現場補位":"協助對象／日期／內容／完成度",
+ "②突發救場":"救援項目／日期／內容／完成度",
+ "③帶人育才":"優化內容／教學同事／教學時間／落地成效",
+ "④跨部門協調":"協助對象／日期／內容／完成度",
+ "⑤直播後覆盤":"覆盤對象／日期／內容／改善方法"};
+const VIOLATIONS=["排期未準時","未完成價格對標/未截圖","未做商品實測","QA未整理/未更新","白板與主播不一致","直播預告未準時","種草/預熱影片未達標","影片置入不符行銷規範","設備未清點/播出中斷","廣告投放未照規範","置頂五項不齊","購物車審核未準時","炒群未達標","開播通知未同步","搖人訊息不足/重複","限動則數未達標","下播1小時內未彙整","數據回報不完整","客服未清空","留言數未達標","群控內容不符/洗版","公告自介未更新","負面留言未準時刪","截圖未準時提交","反饋留言未達標","貼文未準時發佈","連結未放留言區","主管交辦未完成","其他(見備註)"];
+const STATES=[["done","完成"],["partial","部分"],["fail","未完成"],["na","不適用"]];
+const LS="live-daily-report-v1";
+
+/* ============== STATE ============== */
+let S=blank();
+function blank(){return {pos:"運營",ip:"微糖",name:"",date:today(),live:true,items:{},helps:[],deds:[],supOpen:false};}
+function today(){const d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate());}
+function p2(n){return (n<10?"0":"")+n;}
+function $(id){return document.getElementById(id);}
+function el(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;}
+
+/* ============== RENDER ============== */
+function renderSeg(box,arr,cur,cls,cb){box.innerHTML="";arr.forEach(v=>{const b=el("button",v===cur?"on":"",v);b.onclick=()=>cb(v);box.appendChild(b);});}
+function renderMeta(){
+  renderSeg($("posSeg"),POS,S.pos,"",v=>{S.pos=v;S.items={};renderChecklist();renderSummary();});
+  renderSeg($("ipSeg"),IPS,S.ip,"ip",v=>{S.ip=v;renderChecklist();renderSummary();});
+  $("name").value=S.name;$("date").value=S.date;$("liveDay").checked=S.live;
+}
+function renderChecklist(){
+  const host=$("checklist");host.innerHTML="";
+  const items=DATA[S.pos];const cats=[];items.forEach((it,i)=>{if(!cats.length||cats[cats.length-1].cat!==it[0])cats.push({cat:it[0],idx:[]});cats[cats.length-1].idx.push(i);});
+  cats.forEach(group=>{
+    const sec=el("div","sec");
+    const head=el("div","head");
+    const ttl=el("div","ttl",group.cat);
+    const mini=el("div","mini","");
+    const chev=el("div","chev","▾");
+    head.append(ttl,mini,chev);
+    head.onclick=()=>sec.classList.toggle("col");
+    const body=el("div","body");
+    group.idx.forEach(i=>{
+      const it=items[i];const item=el("div","item");
+      item.append(el("div","q",it[1]));
+      if(it[3]==="c"){
+        item.append(el("div","std",it[2]&&it[2]!=="—"?"標準：<b>"+it[2]+"</b>":""));
+        const sb=el("div","statebtns");
+        STATES.forEach(([k,lab])=>{const b=el("button",k,lab);if(S.items[i]===k)b.classList.add("on");
+          b.onclick=()=>{S.items[i]=(S.items[i]===k?undefined:k);renderChecklist();renderSummary();};sb.appendChild(b);});
+        item.append(sb);
+      } else {
+        const thr=it[4][S.ip];
+        item.append(el("div","std","門檻（"+S.ip+"）：<b>"+(thr>0?"≥ "+thr.toLocaleString():"—")+"</b>"));
+        const row=el("div","numrow");
+        const inp=el("input");inp.type="number";inp.min="0";inp.placeholder="當日數量";inp.inputMode="numeric";
+        if(S.items[i]!=null&&S.items[i]!=="")inp.value=S.items[i];
+        const badge=el("span","badge idle","未填");
+        function upd(){const v=inp.value;if(v===""){S.items[i]="";badge.className="badge idle";badge.textContent="未填";}
+          else{S.items[i]=Number(v);const ok=thr<=0||Number(v)>=thr;badge.className="badge "+(ok?"ok":"no");badge.textContent=ok?"達標 ✓":"未達標";}renderSummary();}
+        inp.oninput=upd;row.append(inp,badge);item.append(row);
+      }
+      body.appendChild(item);
+    });
+    const sa=el("div","secact no-print");const all=el("button",null,"本節全部完成");
+    all.onclick=()=>{group.idx.forEach(i=>{if(items[i][3]==="c")S.items[i]="done";});renderChecklist();renderSummary();};
+    sa.appendChild(all);body.appendChild(sa);
+    // mini progress
+    let dc=0,tc=0;group.idx.forEach(i=>{if(items[i][3]==="c"){tc++;if(S.items[i]==="done")dc++;}});
+    mini.textContent=tc?dc+"/"+tc:"";
+    sec.append(head,body);host.appendChild(sec);
+  });
+}
+function calc(){
+  const items=DATA[S.pos];let done=0,part=0,na=0,cTot=0,nOk=0,nTot=0;
+  items.forEach((it,i)=>{
+    if(it[3]==="c"){cTot++;const s=S.items[i];if(s==="done")done++;else if(s==="partial")part++;else if(s==="na")na++;}
+    else{nTot++;const v=S.items[i];if(v!=null&&v!==""){const thr=it[4][S.ip];if(thr<=0||Number(v)>=thr)nOk++;}}
+  });
+  const denom=cTot-na;const rate=denom>0?Math.round((done+0.5*part)/denom*100):0;
+  return {done,part,na,cTot,nOk,nTot,denom,rate};
+}
+function renderSummary(){
+  const c=calc();
+  $("ringTxt").textContent=c.rate+"%";$("ring").style.setProperty("--p",c.rate);
+  $("sDone").textContent=c.done+"/"+c.denom;
+  $("sNum").textContent=c.nOk+"/"+c.nTot;
+  $("sHelp").textContent=S.helps.length;
+  $("sDed").textContent=ded();
+}
+function ded(){let s=0;S.deds.forEach(d=>{s+=Number(d.pts||0);});return Math.max(-30,s);}
+
+/* ---- 互助 ---- */
+function renderHelps(){
+  const host=$("helps");host.innerHTML="";
+  S.helps.forEach((h,idx)=>{
+    const e=el("div","entry");
+    const del=el("button","del","×");del.title="刪除";del.onclick=()=>{S.helps.splice(idx,1);renderHelps();renderSummary();};
+    const r1=el("label","fld");r1.innerHTML="事蹟類型";
+    const sel=el("select");HELP_TYPES.forEach(t=>{const o=el("option",null,t);o.value=t;if(h.type===t)o.selected=true;sel.appendChild(o);});
+    const hint=el("div","hint","建議填寫："+HELP_HINT[h.type||HELP_TYPES[0]]);
+    sel.onchange=()=>{h.type=sel.value;hint.textContent="建議填寫："+HELP_HINT[h.type];};
+    r1.appendChild(sel);
+    const row2=el("div","row2");
+    const f1=el("label","fld");f1.innerHTML="協助/教學對象";const i1=el("input");i1.type="text";i1.value=h.who||"";i1.oninput=()=>h.who=i1.value;f1.appendChild(i1);
+    const f2=el("label","fld");f2.innerHTML="完成度/落地成效";const i2=el("input");i2.type="text";i2.value=h.result||"";i2.oninput=()=>h.result=i2.value;f2.appendChild(i2);
+    row2.append(f1,f2);
+    const f3=el("label","fld");f3.innerHTML="內容（來龍去脈，簡答或詳答）";const ta=el("textarea");ta.rows=2;ta.value=h.content||"";ta.oninput=()=>h.content=ta.value;f3.appendChild(ta);
+    e.append(del,r1,hint,row2,f3);host.appendChild(e);
+  });
+}
+function addHelp(){S.helps.push({type:HELP_TYPES[0],who:"",content:"",result:""});renderHelps();renderSummary();}
+
+/* ---- 扣分 ---- */
+function renderDeds(){
+  const host=$("deds");host.innerHTML="";
+  S.deds.forEach((d,idx)=>{
+    const e=el("div","entry");
+    const del=el("button","del","×");del.onclick=()=>{S.deds.splice(idx,1);renderDeds();renderSummary();};
+    const row2=el("div","row2");
+    const f1=el("label","fld");f1.innerHTML="違反項目";
+    const sel=el("select");const ph=el("option",null,"— 選擇 —");ph.value="";sel.appendChild(ph);
+    VIOLATIONS.forEach(v=>{const o=el("option",null,v);o.value=v;if(d.item===v)o.selected=true;sel.appendChild(o);});
+    sel.onchange=()=>{d.item=sel.value;d.pts=d.item?(-3):0;renderDeds();renderSummary();};f1.appendChild(sel);
+    const f2=el("label","fld");f2.innerHTML="扣分";const i2=el("input");i2.type="number";i2.value=(d.pts!=null?d.pts:-3);i2.step="3";
+    i2.oninput=()=>{d.pts=Number(i2.value);renderSummary();};f2.appendChild(i2);
+    row2.append(f1,f2);
+    const f3=el("label","fld");f3.innerHTML="違反原因/說明";const ta=el("textarea");ta.rows=2;ta.value=d.reason||"";ta.oninput=()=>d.reason=ta.value;f3.appendChild(ta);
+    e.append(del,row2,f3);host.appendChild(e);
+  });
+}
+function addDed(){S.deds.push({item:"",reason:"",pts:-3});renderDeds();renderSummary();}
+
+/* ============== PERSIST ============== */
+function store(){try{return JSON.parse(localStorage.getItem(LS)||'{"recs":{}}');}catch(e){return {recs:{}};}}
+function keyOf(s){return s.pos+"|"+(s.name||"未命名")+"|"+s.date;}
+function save(){
+  syncInputs();const db=store();db.recs[keyOf(S)]=JSON.parse(JSON.stringify(S));
+  try{localStorage.setItem(LS,JSON.stringify(db));toast("已儲存到此裝置 ✓");}catch(e){toast("此瀏覽器無法儲存（請改用下載 JSON）");}
+  renderHistory();
+}
+function renderHistory(){
+  const db=store();const recs=db.recs||{};const keys=Object.keys(recs).sort().reverse();
+  const tbl=$("histTbl");
+  // monthly rollup for current pos+name+month
+  const mo=S.date.slice(0,7);const mine=keys.filter(k=>{const r=recs[k];return r.pos===S.pos&&(r.name||"未命名")===(S.name||"未命名")&&r.date.slice(0,7)===mo;});
+  let rates=[],help=0,helpReal=0,dsum=0;
+  mine.forEach(k=>{const r=recs[k];const c=calcFor(r);if(c.denom>0)rates.push(c.rate);help+=r.helps.length;dsum+=r.deds.reduce((a,d)=>a+Number(d.pts||0),0);});
+  const avg=rates.length?Math.round(rates.reduce((a,b)=>a+b,0)/rates.length):0;
+  $("roll").innerHTML=
+    "<div class='stat'><span class='v'>"+avg+"%</span><span class='k'>平均每日完成率<br>→ 軸一執行</span></div>"+
+    "<div class='stat'><span class='v'>"+help+"</span><span class='k'>互助件數<br>→ 軸二互助</span></div>"+
+    "<div class='stat neg'><span class='v'>"+Math.max(-30,dsum)+"</span><span class='k'>本月扣分合計<br>→ 職責扣分</span></div>"+
+    "<div class='stat'><span class='v'>"+mine.length+"</span><span class='k'>"+mo+" 已填天數</span></div>";
+  let html="<tr><th>日期</th><th>崗位</th><th>姓名</th><th>完成率</th><th>互助</th><th>扣分</th><th></th></tr>";
+  keys.slice(0,40).forEach(k=>{const r=recs[k];const c=calcFor(r);const ds=r.deds.reduce((a,d)=>a+Number(d.pts||0),0);
+    html+="<tr><td>"+r.date+"</td><td>"+r.pos+"</td><td>"+(r.name||"—")+"</td><td>"+(c.denom>0?c.rate+"%":"—")+"</td><td>"+r.helps.length+"</td><td>"+(ds||"")+"</td>"+
+      "<td><a href='#' data-k=\""+k+"\" class='loadk'>載入</a> · <a href='#' data-d=\""+k+"\" class='delk' style='color:var(--fail)'>刪</a></td></tr>";});
+  tbl.innerHTML=html;
+  tbl.querySelectorAll(".loadk").forEach(a=>a.onclick=ev=>{ev.preventDefault();S=JSON.parse(JSON.stringify(recs[a.dataset.k]));boot(true);toast("已載入 "+a.dataset.k);});
+  tbl.querySelectorAll(".delk").forEach(a=>a.onclick=ev=>{ev.preventDefault();const db2=store();delete db2.recs[a.dataset.d];localStorage.setItem(LS,JSON.stringify(db2));renderHistory();});
+}
+function calcFor(r){const items=DATA[r.pos];let done=0,part=0,na=0,cTot=0;items.forEach((it,i)=>{if(it[3]==="c"){cTot++;const s=r.items[i];if(s==="done")done++;else if(s==="partial")part++;else if(s==="na")na++;}});const denom=cTot-na;return {denom,rate:denom>0?Math.round((done+0.5*part)/denom*100):0};}
+
+/* ============== EXPORT ============== */
+function syncInputs(){S.name=$("name").value;S.date=$("date").value;S.live=$("liveDay").checked;}
+function summaryText(){
+  syncInputs();const c=calc();const items=DATA[S.pos];
+  const fails=[];items.forEach((it,i)=>{if(it[3]==="c"&&(S.items[i]==="fail"||S.items[i]==="partial"))fails.push(it[1].split("(")[0].slice(0,14)+(S.items[i]==="partial"?"(部分)":""));});
+  const nums=[];items.forEach((it,i)=>{if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){const thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+" "+S.items[i]+(Number(S.items[i])>=thr||thr<=0?"✓":"✗"));}});
+  let t="【直播每日回報】"+S.pos+"｜"+(S.name||"—")+"｜"+S.date+(S.live?"（直播日）":"");
+  t+="\n完成率："+c.rate+"%（完成 "+c.done+"/"+c.denom+"）";
+  if(nums.length)t+="\n數字："+nums.join("、");
+  if(fails.length)t+="\n待補/未完成："+fails.join("、");
+  t+="\n互助事蹟："+S.helps.length+" 件";
+  const d=ded();if(d<0){t+="\n主管扣分："+d+"（"+S.deds.filter(x=>x.item).map(x=>x.item).join("、")+"）";}
+  return t;
+}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
+function copy(){const t=summaryText();navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>toast("摘要已複製，可貼到 LINE"),()=>fallbackCopy(t));}
+function fallbackCopy(t){const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("摘要已複製");}catch(e){alert(t);}document.body.removeChild(ta);}
+function downloadJson(){syncInputs();const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="回報_"+S.pos+"_"+(S.name||"未命名")+"_"+S.date+".json";a.click();}
+function loadJson(file){const r=new FileReader();r.onload=()=>{try{S=Object.assign(blank(),JSON.parse(r.result));boot(true);toast("已載入檔案");}catch(e){alert("檔案格式錯誤");}};r.readAsText(file);}
+
+/* ============== SERVER SUBMIT ============== */
+function buildPayload(){
+ syncInputs();var c=calc();var items=DATA[S.pos];
+ var fails=[];items.forEach(function(it,i){if(it[3]==="c"&&(S.items[i]==="fail"||S.items[i]==="partial"))fails.push(it[1].slice(0,18)+(S.items[i]==="partial"?"(部分)":""));});
+ var nums=[];items.forEach(function(it,i){if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){var thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+":"+S.items[i]+((thr<=0||Number(S.items[i])>=thr)?"✓":"✗"));}});
+ return {pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,helps:S.helps,deds:S.deds,
+   metrics:{rate:c.rate,done:c.done,denom:c.denom,numOk:c.nOk,numTot:c.nTot,helpCount:S.helps.length,dedTotal:ded()},
+   fails:fails,nums:nums};
+}
+async function submitServer(){
+ syncInputs();
+ if(!(S.name||"").trim()){toast("請先填姓名再送出");$("name").focus();return;}
+ var p=buildPayload();
+ try{
+  var r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+  var j=await r.json();
+  if(j.ok){save();toast(j.updated?"已更新今日回報 ✓":"已送出到主管後台 ✓");}
+  else{toast("送出失敗："+(j.error||"請重試"));}
+ }catch(e){save();toast("無法連線後台，已暫存本機（稍後再送）");}
+}
+/* ============== BOOT ============== */
+function boot(keep){
+  renderMeta();renderChecklist();renderHelps();renderDeds();renderSummary();renderHistory();
+  $("supArea").style.display=S.supOpen?"block":"none";
+  $("supLock").style.display=S.supOpen?"none":"flex";
+}
+function wire(){
+  $("name").oninput=()=>{S.name=$("name").value;};
+  $("date").onchange=()=>{S.date=$("date").value;renderHistory();};
+  $("liveDay").onchange=()=>{S.live=$("liveDay").checked;};
+  $("btnAllDone").onclick=()=>{DATA[S.pos].forEach((it,i)=>{if(it[3]==="c")S.items[i]="done";});renderChecklist();renderSummary();toast("已全部標記完成");};
+  $("btnClear").onclick=()=>{if(confirm("清空今日這份表單？")){const k={pos:S.pos,ip:S.ip,name:S.name,date:S.date};S=Object.assign(blank(),k);boot(true);}};
+  $("btnAddHelp").onclick=addHelp;
+  $("btnAddDed").onclick=addDed;
+  $("btnSup").onclick=()=>{S.supOpen=true;$("supArea").style.display="block";$("supLock").style.display="none";if(!S.deds.length)addDed();};
+  $("btnSubmit").onclick=submitServer;
+  $("btnSave").onclick=save;
+  $("btnCopy").onclick=copy;
+  $("btnPrint").onclick=()=>window.print();
+  $("btnJson").onclick=downloadJson;
+  $("btnLoad").onclick=()=>$("fileIn").click();
+  $("fileIn").onchange=e=>{if(e.target.files[0])loadJson(e.target.files[0]);};
+}
+wire();boot();
+</script>
+</body>
+</html>

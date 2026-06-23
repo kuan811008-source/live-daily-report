@@ -1,0 +1,15 @@
+{
+  "name": "live-daily-report",
+  "version": "1.0.0",
+  "description": "直播團隊每日回報系統（填寫表單 + 主管彙整儀表板）。Node + libsql（本機 file:local.db，線上 Turso）。",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4"
+  }
+}

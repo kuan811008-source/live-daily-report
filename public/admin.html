@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>主管彙整後台 · 直播團隊每日回報</title>
+<style>
+:root{--ink:#1e293b;--muted:#64748b;--line:#e2e8f0;--brand:#1f6b6b;--brand2:#2f759c;--accent:#0ea5e9;
+ --done:#16a34a;--doneBg:#dcfce7;--fail:#dc2626;--failBg:#fee2e2;--shadow:0 1px 3px rgba(15,23,42,.08);}
+*{box-sizing:border-box}body{margin:0;font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;background:#f1f5f9;color:var(--ink)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 14px 80px}
+header.top{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:16px;border-radius:0 0 18px 18px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+header.top h1{margin:0;font-size:18px}
+.card{background:#fff;border-radius:14px;box-shadow:var(--shadow);padding:16px;margin:14px 0}
+.btn{font:inherit;font-size:13px;font-weight:700;border:none;border-radius:10px;padding:9px 13px;cursor:pointer}
+.btn.brand{background:var(--brand);color:#fff}.btn.soft{background:#eef2f7;color:var(--ink)}.btn.ghost{background:#fff;color:var(--brand);border:1.5px solid var(--line)}
+.btn:active{transform:translateY(1px)}
+input,select{font:inherit;font-size:14px;background:#f8fafc;border:1.5px solid var(--line);border-radius:10px;padding:9px 11px}
+input:focus,select:focus{outline:none;border-color:var(--accent);background:#fff}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.controls label{font-size:12px;color:var(--muted);font-weight:700;display:flex;flex-direction:column;gap:4px}
+h2{font-size:15px;margin:0 0 10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:center}
+th{background:#f1f5f9;position:sticky;top:0}
+td.l,th.l{text-align:left}
+.pill{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#eef2f7;color:var(--brand)}
+.rate{font-weight:800}
+.rate.good{color:var(--done)}.rate.bad{color:var(--fail)}
+.ded{color:var(--fail);font-weight:800}
+.del{background:none;border:none;color:var(--fail);cursor:pointer;font-weight:700;font-size:12px}
+.fails{font-size:11.5px;color:var(--muted);text-align:left;max-width:280px}
+.tablewrap{overflow:auto;max-height:60vh;border-radius:10px;border:1px solid var(--line)}
+.note{font-size:12px;color:var(--muted)}
+.map{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.map span{font-size:11.5px;background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:999px;padding:3px 10px}
+.empty{text-align:center;color:var(--muted);padding:26px;font-size:13px}
+/* login */
+#login{max-width:360px;margin:60px auto}
+#login .card{text-align:center}
+#login input{width:100%;margin:10px 0;text-align:center}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="login" style="display:none">
+  <div class="card">
+    <h2>主管後台登入</h2>
+    <p class="note">請輸入後台密碼（預設 admin123）</p>
+    <input type="password" id="pw" placeholder="後台密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn brand" style="width:100%" onclick="doLogin()">登入</button>
+    <p class="note" id="loginErr" style="color:var(--fail)"></p>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header class="top">
+    <h1>📊 主管彙整後台 · 直播團隊每日回報</h1>
+    <button class="btn soft" onclick="logout()">登出</button>
+  </header>
+  <div class="wrap">
+    <div class="card">
+      <div class="controls">
+        <label>月份 <input type="month" id="fMonth"></label>
+        <label>崗位
+          <select id="fPos"><option value="">全部</option><option>運營</option><option>小編</option><option>群控</option></select>
+        </label>
+        <button class="btn brand" onclick="load()">🔄 重新整理</button>
+        <button class="btn ghost" onclick="exportCsv()">⬇️ 匯出 CSV</button>
+        <span class="note" id="count"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>月度彙總（每人）— 直接接月度考核</h2>
+      <div class="map">
+        <span>平均每日完成率 → 軸一執行</span>
+        <span>互助件數 → 軸二互助</span>
+        <span>本月扣分合計（封頂 −30）→ 職責扣分</span>
+      </div>
+      <div class="tablewrap"><table id="sumTbl"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>每日填答明細</h2>
+      <div class="tablewrap"><table id="detTbl"></table></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const POS_ORDER={運營:1,小編:2,群控:3};
+function $(id){return document.getElementById(id);}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800);}
+function thisMonth(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+
+async function check(){
+  const r=await fetch('/api/admin/check');const j=await r.json();
+  if(j.isAdmin){showApp();}else{$("login").style.display="block";$("app").style.display="none";}
+}
+async function doLogin(){
+  const pw=$("pw").value;
+  const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  if(r.ok){showApp();}else{$("loginErr").textContent="密碼錯誤";}
+}
+async function logout(){await fetch('/api/admin/logout',{method:'POST'});location.reload();}
+function showApp(){$("login").style.display="none";$("app").style.display="block";if(!$("fMonth").value)$("fMonth").value=thisMonth();load();}
+
+async function load(){
+  const m=$("fMonth").value;const pos=$("fPos").value;
+  const r=await fetch('/api/admin/data?month='+encodeURIComponent(m)+(pos?'&pos='+encodeURIComponent(pos):''));
+  if(r.status===401){check();return;}
+  const j=await r.json();
+  renderSummary(j.summary);renderDetail(j.submissions);
+  $("count").textContent="共 "+j.submissions.length+" 筆填答";
+}
+
+function renderSummary(sum){
+  const t=$("sumTbl");
+  if(!sum.length){t.innerHTML="<tr><td class='empty'>本月尚無資料</td></tr>";return;}
+  sum.sort((a,b)=>(POS_ORDER[a.pos]-POS_ORDER[b.pos])||a.name.localeCompare(b.name));
+  let h="<tr><th class='l'>崗位</th><th class='l'>姓名</th><th>已填天數</th><th>平均每日完成率<br><span class='note'>軸一執行</span></th><th>互助件數<br><span class='note'>軸二互助</span></th><th>本月扣分合計<br><span class='note'>職責扣分</span></th></tr>";
+  sum.forEach(s=>{
+    h+="<tr><td class='l'><span class='pill'>"+s.pos+"</span></td><td class='l'>"+esc(s.name)+"</td><td>"+s.days+"</td>"+
+       "<td class='rate "+(s.avgRate>=75?'good':s.avgRate<60?'bad':'')+"'>"+s.avgRate+"%</td>"+
+       "<td>"+s.helps+"</td><td class='ded'>"+(s.ded||0)+"</td></tr>";
+  });
+  t.innerHTML=h;
+}
+function renderDetail(subs){
+  const t=$("detTbl");
+  if(!subs.length){t.innerHTML="<tr><td class='empty'>本月尚無填答</td></tr>";return;}
+  let h="<tr><th>日期</th><th>崗位</th><th class='l'>姓名</th><th>IP</th><th>完成率</th><th>數字達標</th><th>互助</th><th>扣分</th><th class='l'>未完成/部分項目</th><th></th></tr>";
+  subs.forEach(s=>{
+    const m=s.metrics||{};
+    h+="<tr><td>"+s.date+"</td><td><span class='pill'>"+s.pos+"</span></td><td class='l'>"+esc(s.name)+"</td><td>"+esc(s.ip||'')+"</td>"+
+       "<td class='rate "+(m.rate>=75?'good':m.rate<60?'bad':'')+"'>"+(m.denom>0?m.rate+'%':'—')+"</td>"+
+       "<td>"+(m.numTot?m.numOk+'/'+m.numTot:'—')+"</td><td>"+(m.helpCount||0)+"</td>"+
+       "<td class='"+(m.dedTotal<0?'ded':'')+"'>"+(m.dedTotal||'')+"</td>"+
+       "<td class='fails'>"+esc((s.fails||[]).join('、'))+"</td>"+
+       "<td><button class='del' onclick=\"del('"+s.id+"')\">刪除</button></td></tr>";
+  });
+  t.innerHTML=h;
+}
+async function del(id){
+  if(!confirm("確定刪除這筆填答？"))return;
+  await fetch('/api/admin/submission?id='+encodeURIComponent(id),{method:'DELETE'});
+  toast("已刪除");load();
+}
+function exportCsv(){const m=$("fMonth").value;window.location='/api/admin/export?month='+encodeURIComponent(m);}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+check();
+</script>
+</body>
+</html>
