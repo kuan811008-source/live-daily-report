@@ -429,8 +429,10 @@ function summaryText(){
   t+="\n完成率："+c.rate+"%（完成 "+c.done+"/"+c.denom+"）";
   if(nums.length)t+="\n數字："+nums.join("、");
   if(fails.length)t+="\n待補/未完成："+fails.join("、");
-  t+="\n互助事蹟："+S.helps.length+" 件";
-  const d=ded();if(d<0){t+="\n主管扣分："+d+"（"+S.deds.filter(x=>x.item).map(x=>x.item).join("、")+"）";}
+  if(S.helps.length){t+="\n──新人＆舊人 互助事蹟（"+S.helps.length+" 件）──";S.helps.forEach(function(x){var p=[];if(x.who)p.push("對象 "+x.who);if(x.content)p.push("內容 "+x.content);if(x.result)p.push("成效 "+x.result);t+="\n・"+(x.type||"")+(p.length?"｜"+p.join("｜"):"");});}
+  else{t+="\n互助事蹟：無";}
+  var vd=S.deds.filter(function(x){return x.item;});
+  if(vd.length){t+="\n──主管扣分（合計 "+ded()+"）──";vd.forEach(function(x){t+="\n・"+x.item+(x.reason?"（"+x.reason+"）":"")+" "+(x.pts!=null?x.pts:"");});}
   return t;
 }
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
