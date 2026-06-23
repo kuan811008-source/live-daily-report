@@ -281,8 +281,8 @@ function el(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!=nu
 /* ============== RENDER ============== */
 function renderSeg(box,arr,cur,cls,cb){box.innerHTML="";arr.forEach(v=>{const b=el("button",v===cur?"on":"",v);b.onclick=()=>cb(v);box.appendChild(b);});}
 function renderMeta(){
-  renderSeg($("posSeg"),POS,S.pos,"",v=>{S.pos=v;S.items={};renderChecklist();renderSummary();});
-  renderSeg($("ipSeg"),IPS,S.ip,"ip",v=>{S.ip=v;renderChecklist();renderSummary();});
+  renderSeg($("posSeg"),POS,S.pos,"",v=>{S.pos=v;S.items={};renderMeta();renderChecklist();renderSummary();});
+  renderSeg($("ipSeg"),IPS,S.ip,"ip",v=>{S.ip=v;renderMeta();renderChecklist();renderSummary();});
   $("name").value=S.name;$("date").value=S.date;$("liveDay").checked=S.live;
 }
 function renderChecklist(){
