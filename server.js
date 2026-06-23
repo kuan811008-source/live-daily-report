@@ -142,6 +142,20 @@ const server = http.createServer(async (req, res) => {
         await db.execute({ sql: 'DELETE FROM submissions WHERE id=?', args: [u.searchParams.get('id')] });
         return send(res, 200, { ok: true });
       }
+      // 主管在後台新增/編輯某筆回報的扣分
+      if (pn === '/api/admin/deductions' && req.method === 'POST') {
+        const id = u.searchParams.get('id');
+        const b = await readBody(req);
+        const deds = Array.isArray(b.deds) ? b.deds.filter(d => d && d.item).map(d => ({ item: String(d.item), reason: String(d.reason || ''), pts: Number(d.pts) || 0 })) : [];
+        const r = await db.execute({ sql: 'SELECT payload FROM submissions WHERE id=?', args: [id] });
+        if (!r.rows.length) return send(res, 404, { error: '找不到該筆回報' });
+        const payload = JSON.parse(r.rows[0].payload);
+        payload.deds = deds;
+        payload.metrics = payload.metrics || {};
+        payload.metrics.dedTotal = deds.reduce((a, d) => a + d.pts, 0);
+        await db.execute({ sql: 'UPDATE submissions SET payload=? WHERE id=?', args: [JSON.stringify(payload), id] });
+        return send(res, 200, { ok: true, dedTotal: payload.metrics.dedTotal });
+      }
       if (pn === '/api/admin/export') {
         const m = u.searchParams.get('month');
         const subs = (await listSubs(m, null)).sort((a, b) => a.date.localeCompare(b.date));

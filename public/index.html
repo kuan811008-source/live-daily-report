@@ -140,7 +140,6 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
       <div class="stat"><span class="v" id="sDone">0/0</span><span class="k">勾選完成</span></div>
       <div class="stat"><span class="v" id="sNum">0/0</span><span class="k">數字達標</span></div>
       <div class="stat"><span class="v" id="sHelp">0</span><span class="k">互助事蹟</span></div>
-      <div class="stat neg"><span class="v" id="sDed">0</span><span class="k">主管扣分</span></div>
     </div>
     <div class="sumact">
       <button class="btn soft" id="btnAllDone">全部完成</button>
@@ -160,20 +159,6 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
     <div class="hint">核心目標：①積極提醒並協助同事準時完成 ②直播後覆盤並提出改善 ③維持良好跨部門合作與溝通。當天有事蹟才填，可簡答或詳答。</div>
     <div id="helps"></div>
     <button class="btn ghost no-print" id="btnAddHelp">＋ 新增互助事蹟</button>
-  </div>
-
-  <!-- PART 3 -->
-  <div class="card">
-    <h2><span class="tag">第三部分</span>主管扣分</h2>
-    <div class="hint">本區由主管填寫。每違反一項 −3，單月上限 −30；觸犯紀律紅線另依考核辦法（封頂40＋人評會）。</div>
-    <div class="sup-lock no-print" id="supLock">
-      <button class="btn soft" id="btnSup">🔒 主管開啟扣分區</button>
-      <span style="font-size:11.5px;color:var(--muted)">（避免填寫者誤改）</span>
-    </div>
-    <div id="supArea" style="display:none">
-      <div id="deds"></div>
-      <button class="btn ghost no-print" id="btnAddDed">＋ 新增扣分紀錄</button>
-    </div>
   </div>
 
   <!-- ACTIONS -->
@@ -343,7 +328,6 @@ function renderSummary(){
   $("sDone").textContent=c.done+"/"+c.denom;
   $("sNum").textContent=c.nOk+"/"+c.nTot;
   $("sHelp").textContent=S.helps.length;
-  $("sDed").textContent=ded();
 }
 function ded(){let s=0;S.deds.forEach(d=>{s+=Number(d.pts||0);});return Math.max(-30,s);}
 
@@ -465,9 +449,7 @@ async function submitServer(){
 }
 /* ============== BOOT ============== */
 function boot(keep){
-  renderMeta();renderChecklist();renderHelps();renderDeds();renderSummary();renderHistory();
-  $("supArea").style.display=S.supOpen?"block":"none";
-  $("supLock").style.display=S.supOpen?"none":"flex";
+  renderMeta();renderChecklist();renderHelps();renderSummary();renderHistory();
 }
 function wire(){
   $("name").oninput=()=>{S.name=$("name").value;};
@@ -476,8 +458,6 @@ function wire(){
   $("btnAllDone").onclick=()=>{DATA[S.pos].forEach((it,i)=>{if(it[3]==="c")S.items[i]="done";});renderChecklist();renderSummary();toast("已全部標記完成");};
   $("btnClear").onclick=()=>{if(confirm("清空今日這份表單？")){const k={pos:S.pos,ip:S.ip,name:S.name,date:S.date};S=Object.assign(blank(),k);boot(true);}};
   $("btnAddHelp").onclick=addHelp;
-  $("btnAddDed").onclick=addDed;
-  $("btnSup").onclick=()=>{S.supOpen=true;$("supArea").style.display="block";$("supLock").style.display="none";if(!S.deds.length)addDed();};
   $("btnSubmit").onclick=submitServer;
   $("btnSave").onclick=save;
   $("btnCopy").onclick=copy;

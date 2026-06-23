@@ -56,6 +56,11 @@ td.l,th.l{text-align:left}
 .dcard{border:1.5px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;font-size:13px;text-align:left}
 .dcard .t{font-weight:800;color:var(--brand)}
 .dempty{color:var(--muted);font-size:13px;padding:6px}
+.dedrow{display:flex;gap:6px;align-items:center;margin:5px 0;flex-wrap:wrap}
+.dedrow select{font-size:12.5px;padding:6px 8px;max-width:210px}
+.dedrow input{font-size:12.5px;padding:6px 8px}
+.dedrow .rs{flex:1;min-width:130px}
+.dedx{background:none;border:none;color:var(--fail);cursor:pointer;font-size:18px;line-height:1}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:99}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
@@ -117,6 +122,8 @@ td.l,th.l{text-align:left}
 <script>
 const POS_ORDER={運營:1,小編:2,群控:3};
 let subsById={};
+let editId=null,editDeds=[];
+const VIOLATIONS=["排期未準時","未完成價格對標/未截圖","未做商品實測","QA未整理/未更新","白板與主播不一致","直播預告未準時","種草/預熱影片未達標","影片置入不符行銷規範","設備未清點/播出中斷","廣告投放未照規範","置頂五項不齊","購物車審核未準時","炒群未達標","開播通知未同步","搖人訊息不足/重複","限動則數未達標","下播1小時內未彙整","數據回報不完整","客服未清空","留言數未達標","群控內容不符/洗版","公告自介未更新","負面留言未準時刪","截圖未準時提交","反饋留言未達標","貼文未準時發佈","連結未放留言區","主管交辦未完成","其他(見備註)"];
 function $(id){return document.getElementById(id);}
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800);}
 function thisMonth(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
@@ -187,10 +194,30 @@ function openDetail(id){
   h+="<div class='dsec'><h3>第二部分　互助事蹟</h3>";
   if((s.helps||[]).length){s.helps.forEach(function(x){h+="<div class='dcard'><div class='t'>"+esc(x.type||'')+"</div>"+(x.who?"<div>對象/教學："+esc(x.who)+"</div>":"")+(x.content?"<div>內容："+esc(x.content)+"</div>":"")+(x.result?"<div>完成度/成效："+esc(x.result)+"</div>":"")+"</div>";});}else{h+="<div class='dempty'>（無）</div>";}
   h+="</div>";
-  h+="<div class='dsec'><h3>第三部分　主管扣分</h3>";
-  if((s.deds||[]).length){s.deds.forEach(function(x){h+="<div class='dcard'><div class='t' style='color:var(--fail)'>"+esc(x.item||'')+"　"+(x.pts!=null?x.pts:'')+"</div>"+(x.reason?"<div>原因："+esc(x.reason)+"</div>":"")+"</div>";});}else{h+="<div class='dempty'>（無）</div>";}
-  h+="</div>";
+  h+="<div class='dsec'><h3>第三部分　主管扣分（主管操作）</h3><div id='dedEditArea'></div></div>";
   $("detailBody").innerHTML=h; $("detailModal").classList.add("show");
+  editId=id; editDeds=JSON.parse(JSON.stringify(s.deds||[])); renderEditDeds();
+}
+function renderEditDeds(){
+  var box=$("dedEditArea"); if(!box)return; var h="";
+  editDeds.forEach(function(d,i){
+    var opts="<option value=''>—違反項目—</option>"+VIOLATIONS.map(function(v){return "<option"+(d.item===v?" selected":"")+">"+esc(v)+"</option>";}).join("");
+    h+="<div class='dedrow'><select onchange=\"updateDed("+i+",'item',this.value)\">"+opts+"</select>";
+    h+="<input type='text' class='rs' placeholder='原因/說明' value=\""+esc(d.reason||'')+"\" oninput=\"updateDed("+i+",'reason',this.value)\">";
+    h+="<input type='number' step='3' style='width:64px' value='"+(d.pts!=null?d.pts:-3)+"' oninput=\"updateDed("+i+",'pts',this.value)\">";
+    h+="<button class='dedx' title='移除' onclick='removeDedRow("+i+")'>×</button></div>";
+  });
+  var tot=Math.max(-30,editDeds.reduce(function(a,d){return a+(Number(d.pts)||0);},0));
+  h+="<div style='margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap'><button class='btn ghost' onclick='addDedRow()'>＋ 新增扣分</button><button class='btn brand' onclick='saveDeds()'>💾 儲存扣分</button><span style='font-size:12px;color:var(--muted)'>合計 "+tot+"（單月上限 −30）</span></div>";
+  box.innerHTML=h;
+}
+function addDedRow(){editDeds.push({item:'',reason:'',pts:-3});renderEditDeds();}
+function removeDedRow(i){editDeds.splice(i,1);renderEditDeds();}
+function updateDed(i,f,v){if(editDeds[i])editDeds[i][f]=(f==='pts'?Number(v):v);}
+async function saveDeds(){
+  var deds=editDeds.filter(function(d){return d.item;});
+  var r=await fetch('/api/admin/deductions?id='+encodeURIComponent(editId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deds:deds})});
+  if(r.ok){toast('扣分已儲存 ✓');var keep=editId;await load();if(subsById[keep])openDetail(keep);}else{toast('儲存失敗');}
 }
 function closeDetail(){$("detailModal").classList.remove("show");}
 function exportCsv(){const m=$("fMonth").value;window.location='/api/admin/export?month='+encodeURIComponent(m);}
