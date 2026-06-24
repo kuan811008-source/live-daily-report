@@ -61,6 +61,20 @@ td.l,th.l{text-align:left}
 .dedrow input{font-size:12.5px;padding:6px 8px}
 .dedrow .rs{flex:1;min-width:130px}
 .dedx{background:none;border:none;color:var(--fail);cursor:pointer;font-size:18px;line-height:1}
+.tpltabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.tpltab{font:inherit;font-size:13px;font-weight:700;border:1.5px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:6px 14px;cursor:pointer}
+.tpltab.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.tplnote{font-size:12px;color:var(--muted);background:#f8fafc;border-left:3px solid var(--brand2);padding:7px 10px;border-radius:0 8px 8px 0;margin-bottom:10px}
+.tplitem{border:1.5px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;background:#fcfdff}
+.tplr{display:flex;gap:6px;align-items:center;margin:5px 0;flex-wrap:wrap}
+.in{font:inherit;font-size:13px;background:#fff;border:1.5px solid var(--line);border-radius:8px;padding:7px 9px}
+.in:focus{outline:none;border-color:var(--accent)}
+.tqa{width:100%;min-height:46px;resize:vertical;margin:5px 0}
+.num{width:78px}
+.tplact{display:flex;gap:6px;margin-top:6px}
+.tplact button{font:inherit;font-size:12px;font-weight:700;border:1.5px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;cursor:pointer}
+.tplact .rm{color:var(--fail);border-color:#fecaca;margin-left:auto}
+.tthr{font-size:12.5px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:99}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
@@ -90,6 +104,7 @@ td.l,th.l{text-align:left}
         </label>
         <button class="btn brand" onclick="load()">🔄 重新整理</button>
         <button class="btn ghost" onclick="exportCsv()">⬇️ 匯出 CSV</button>
+        <button class="btn ghost" onclick="openTplEditor()">📝 編輯回報表內容</button>
         <span class="note" id="count"></span>
       </div>
     </div>
@@ -115,6 +130,17 @@ td.l,th.l{text-align:left}
   <div class="modalbox">
     <button class="modalclose" onclick="closeDetail()">×</button>
     <div id="detailBody"></div>
+  </div>
+</div>
+<div id="tplModal" class="modal" onclick="if(event.target===this)closeTpl()">
+  <div class="modalbox">
+    <button class="modalclose" onclick="closeTpl()">×</button>
+    <h2 style="margin:0 0 8px;font-size:17px">📝 編輯回報表內容</h2>
+    <div id="tplBody"></div>
+    <div style="position:sticky;bottom:0;background:#fff;padding:10px 0 2px;margin-top:10px;border-top:1px solid var(--line);display:flex;gap:8px">
+      <button class="btn brand" onclick="saveTpl()">💾 儲存</button>
+      <button class="btn soft" onclick="closeTpl()">關閉</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -220,6 +246,43 @@ async function saveDeds(){
   if(r.ok){toast('扣分已儲存 ✓');var keep=editId;await load();if(subsById[keep])openDetail(keep);}else{toast('儲存失敗');}
 }
 function closeDetail(){$("detailModal").classList.remove("show");}
+/* ===== 回報表範本編輯 ===== */
+let tpl=null, tplPos='運營';
+async function openTplEditor(){
+  try{ var r=await fetch('/api/template'); tpl=await r.json(); }catch(e){ tpl={}; }
+  if(!tpl||typeof tpl!=='object')tpl={};
+  ['運營','小編','群控'].forEach(function(p){ if(!Array.isArray(tpl[p]))tpl[p]=[]; });
+  tplPos='運營'; renderTpl(); $("tplModal").classList.add("show");
+}
+function closeTpl(){$("tplModal").classList.remove("show");}
+function tplSetPos(p){tplPos=p;renderTpl();}
+function renderTpl(){
+  var items=tpl[tplPos]||[];
+  var tabs=['運營','小編','群控'].map(function(p){return "<button class='tpltab"+(p===tplPos?' on':'')+"' onclick=\"tplSetPos('"+p+"')\">"+p+"（"+(tpl[p]||[]).length+"）</button>";}).join('');
+  var h="<div class='tpltabs'>"+tabs+"</div><div class='tplnote'>「分類」相同的項目會自動歸成同一段（依此處上下順序）。類型選「數字」時可設各 IP 門檻（達標自動轉綠）。改完按下方「儲存」，填寫頁重新整理即生效。</div>";
+  items.forEach(function(it,i){
+    var isNum=it[3]==='n'; var thr=it[4]||{};
+    h+="<div class='tplitem'>";
+    h+="<div class='tplr'><input class='in' style='flex:1;min-width:140px' placeholder='分類（例：一、排期與規劃）' value=\""+esc(it[0]||'')+"\" oninput=\"tplUp("+i+",0,this.value)\">";
+    h+="<select class='in' onchange=\"tplType("+i+",this.value)\"><option value='c'"+(isNum?'':' selected')+">勾選</option><option value='n'"+(isNum?' selected':'')+">數字</option></select></div>";
+    h+="<textarea class='in tqa' placeholder='工作項目內容' oninput=\"tplUp("+i+",1,this.value)\">"+esc(it[1]||'')+"</textarea>";
+    h+="<div class='tplr'><input class='in' style='flex:1;min-width:140px' placeholder='標準/門檻說明（顯示用）' value=\""+esc(it[2]||'')+"\" oninput=\"tplUp("+i+",2,this.value)\"></div>";
+    if(isNum){ h+="<div class='tplr tthr'>門檻 微糖<input class='in num' type='number' value='"+(thr['微糖']||0)+"' oninput=\"tplThr("+i+",'微糖',this.value)\">白姊<input class='in num' type='number' value='"+(thr['白姊']||0)+"' oninput=\"tplThr("+i+",'白姊',this.value)\">棠棠<input class='in num' type='number' value='"+(thr['棠棠']||0)+"' oninput=\"tplThr("+i+",'棠棠',this.value)\"></div>"; }
+    h+="<div class='tplact'><button onclick='tplMove("+i+",-1)'>↑</button><button onclick='tplMove("+i+",1)'>↓</button><button class='rm' onclick='tplDel("+i+")'>✕ 移除</button></div></div>";
+  });
+  h+="<div style='margin-top:10px'><button class='btn ghost' onclick='tplAdd()'>＋ 新增項目</button></div>";
+  $("tplBody").innerHTML=h;
+}
+function tplUp(i,f,v){tpl[tplPos][i][f]=v;}
+function tplThr(i,ip,v){if(!tpl[tplPos][i][4])tpl[tplPos][i][4]={};tpl[tplPos][i][4][ip]=Number(v)||0;}
+function tplType(i,v){var it=tpl[tplPos][i];it[3]=v;if(v==='n'&&!it[4])it[4]={'微糖':0,'白姊':0,'棠棠':0};renderTpl();}
+function tplAdd(){var a=tpl[tplPos];a.push([a.length?a[a.length-1][0]:'一、',' ','','c']);a[a.length-1][1]='';renderTpl();}
+function tplDel(i){if(confirm('移除這個項目？'))( tpl[tplPos].splice(i,1),renderTpl());}
+function tplMove(i,d){var a=tpl[tplPos],j=i+d;if(j<0||j>=a.length)return;var t=a[i];a[i]=a[j];a[j]=t;renderTpl();}
+async function saveTpl(){
+  var r=await fetch('/api/admin/template',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(tpl)});
+  if(r.ok){toast('回報表已儲存 ✓ 填寫頁重新整理即生效');}else{toast('儲存失敗');}
+}
 function exportCsv(){const m=$("fMonth").value;window.location='/api/admin/export?month='+encodeURIComponent(m);}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 

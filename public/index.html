@@ -212,7 +212,7 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
 const IPS=["微糖","白姊","棠棠"];
 const POS=["運營","小編","群控"];
 // item: {cat, q, std, type:'c'|'n', thr:{微糖,白姊,棠棠}}
-const DATA={
+let DATA={
 "運營":[
  ["一、排期與規劃","每月15/30日前完成下兩週直播排期，登記雲端審核表並通知小前審核","15·30日前","c"],
  ["二、開播前準備","商品價格對標(蝦皮/momo/酷澎/PCHOME)，確認價差並截圖存團隊記事本","確認價差","c"],
@@ -483,7 +483,9 @@ function wire(){
   $("btnLoad").onclick=()=>$("fileIn").click();
   $("fileIn").onchange=e=>{if(e.target.files[0])loadJson(e.target.files[0]);};
 }
-wire();boot();
+function startApp(t){ if(t && (t["運營"]||t["小編"]||t["群控"])) DATA=t; wire(); boot(); }
+function loadTpl(n){ fetch('/api/template').then(function(r){return r.json();}).then(function(t){ startApp(t); }).catch(function(){ if(n>0){ setTimeout(function(){loadTpl(n-1);},1200); } else { startApp(null); } }); }
+loadTpl(3);
 </script>
 </body>
 </html>

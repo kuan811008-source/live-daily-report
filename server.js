@@ -20,6 +20,7 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN || undefined,
 });
 
+const TEMPLATE_FILE = path.join(PUBLIC, 'default-template.json');
 async function initDB() {
   await db.execute(`CREATE TABLE IF NOT EXISTS submissions (
     id TEXT PRIMARY KEY,
@@ -30,6 +31,17 @@ async function initDB() {
     received_at TEXT NOT NULL,
     UNIQUE(name, pos, date)
   )`);
+  await db.execute(`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)`);
+  const t = await db.execute({ sql: 'SELECT value FROM config WHERE key=?', args: ['template'] });
+  if (!t.rows.length) {
+    let def = '{}'; try { def = fs.readFileSync(TEMPLATE_FILE, 'utf8'); } catch (e) {}
+    await db.execute({ sql: 'INSERT INTO config (key,value) VALUES (?,?)', args: ['template', def] });
+  }
+}
+async function getTemplate() {
+  const r = await db.execute({ sql: 'SELECT value FROM config WHERE key=?', args: ['template'] });
+  if (r.rows.length) { try { return JSON.parse(r.rows[0].value); } catch (e) {} }
+  try { return JSON.parse(fs.readFileSync(TEMPLATE_FILE, 'utf8')); } catch (e) { return {}; }
 }
 
 const sessions = new Set(); // in-memory admin tokens (reset on restart)
@@ -118,6 +130,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, id });
     }
 
+    // 回報表範本（填寫頁載入用，公開讀取）
+    if (pn === '/api/template' && req.method === 'GET') {
+      return send(res, 200, await getTemplate());
+    }
+
     // 主管登入 / 狀態 / 登出
     if (pn === '/api/admin/login' && req.method === 'POST') {
       const b = await readBody(req);
@@ -155,6 +172,21 @@ const server = http.createServer(async (req, res) => {
         payload.metrics.dedTotal = deds.reduce((a, d) => a + d.pts, 0);
         await db.execute({ sql: 'UPDATE submissions SET payload=? WHERE id=?', args: [JSON.stringify(payload), id] });
         return send(res, 200, { ok: true, dedTotal: payload.metrics.dedTotal });
+      }
+      // 主管編輯回報表範本
+      if (pn === '/api/admin/template' && req.method === 'POST') {
+        const b = await readBody(req);
+        if (!b || typeof b !== 'object' || Array.isArray(b)) return send(res, 400, { error: '格式錯誤' });
+        const clean = {};
+        ['運營', '小編', '群控'].forEach(pos => {
+          if (Array.isArray(b[pos])) clean[pos] = b[pos].filter(it => Array.isArray(it) && String(it[1] || '').trim()).map(it => {
+            const cat = String(it[0] || ''); const q = String(it[1] || ''); const std = String(it[2] || ''); const type = it[3] === 'n' ? 'n' : 'c';
+            if (type === 'n') { const thr = it[4] || {}; return [cat, q, std, 'n', { '微糖': Number(thr['微糖']) || 0, '白姊': Number(thr['白姊']) || 0, '棠棠': Number(thr['棠棠']) || 0 }]; }
+            return [cat, q, std, 'c'];
+          });
+        });
+        await db.execute({ sql: 'INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', args: ['template', JSON.stringify(clean)] });
+        return send(res, 200, { ok: true });
       }
       if (pn === '/api/admin/export') {
         const m = u.searchParams.get('month');
