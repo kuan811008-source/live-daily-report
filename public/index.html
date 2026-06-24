@@ -100,7 +100,24 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
   padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:99}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .foot{text-align:center;font-size:11px;color:var(--muted);margin-top:10px}
-@media (max-width:540px){.grid.meta{grid-template-columns:1fr}.entry .row2{grid-template-columns:1fr}}
+@media (max-width:540px){
+  .grid.meta{grid-template-columns:1fr}
+  .entry .row2{grid-template-columns:1fr}
+  .seg{gap:8px}
+  .seg button{flex:1 1 0;min-height:46px;font-size:15px;padding:8px 4px}
+  .summary{padding:9px 11px;gap:10px;top:6px}
+  .ring{width:46px;height:46px}
+  .ring::before{inset:5px}
+  .ring b{font-size:12px}
+  .stat .v{font-size:15px}.stat .k{font-size:10px}
+  .sumact{width:100%;gap:8px}
+  .sumact .btn{flex:1;padding:9px 10px;font-size:13px}
+  .item{padding:12px 13px}
+  .item .q{font-size:14.5px}
+  .statebtns{gap:6px}
+  .statebtns button{flex:1 1 0;min-height:40px;font-size:13px}
+  .numrow input{max-width:none;flex:1}
+}
 @media print{
   body{background:#fff}.summary,.sumact,.secact,.btn,.actbar,.sup-lock .btn,details.hist,header.top .sub{box-shadow:none}
   .no-print{display:none !important}.card,.sec{box-shadow:none;border-color:#ccc}.sec.col>.body{display:block !important}
