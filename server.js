@@ -80,18 +80,20 @@ function summarize(subs) {
   const g = {};
   subs.forEach(s => {
     const k = s.name + '|' + s.pos;
-    if (!g[k]) g[k] = { name: s.name, pos: s.pos, days: 0, rates: [], helps: 0, ded: 0 };
+    if (!g[k]) g[k] = { name: s.name, pos: s.pos, days: 0, rates: [], helps: 0, ded: 0, scores: [] };
     const G = g[k]; G.days++;
     const m = s.metrics || {};
     if (m.denom > 0) G.rates.push(m.rate);
     G.helps += (m.helpCount || 0);
     G.ded += (m.dedTotal || 0);
+    if (s.review && s.review.score != null && s.review.score !== '') G.scores.push(Number(s.review.score));
   });
   return Object.values(g)
     .map(G => ({
       name: G.name, pos: G.pos, days: G.days,
       avgRate: G.rates.length ? Math.round(G.rates.reduce((a, b) => a + b, 0) / G.rates.length) : 0,
-      helps: G.helps, ded: Math.max(-30, G.ded)
+      helps: G.helps, ded: Math.max(-30, G.ded),
+      avgScore: G.scores.length ? Math.round(G.scores.reduce((a, b) => a + b, 0) / G.scores.length) : null
     }))
     .sort((a, b) => a.pos.localeCompare(b.pos) || a.name.localeCompare(b.name));
 }
@@ -172,6 +174,20 @@ const server = http.createServer(async (req, res) => {
         payload.metrics.dedTotal = deds.reduce((a, d) => a + d.pts, 0);
         await db.execute({ sql: 'UPDATE submissions SET payload=? WHERE id=?', args: [JSON.stringify(payload), id] });
         return send(res, 200, { ok: true, dedTotal: payload.metrics.dedTotal });
+      }
+      // 主管評分/回饋（每筆）
+      if (pn === '/api/admin/review' && req.method === 'POST') {
+        const id = u.searchParams.get('id');
+        const b = await readBody(req);
+        const r = await db.execute({ sql: 'SELECT payload FROM submissions WHERE id=?', args: [id] });
+        if (!r.rows.length) return send(res, 404, { error: '找不到該筆回報' });
+        const payload = JSON.parse(r.rows[0].payload);
+        payload.review = {
+          score: (b.score === '' || b.score == null) ? null : Number(b.score),
+          good: String(b.good || ''), improve: String(b.improve || ''), comment: String(b.comment || '')
+        };
+        await db.execute({ sql: 'UPDATE submissions SET payload=? WHERE id=?', args: [JSON.stringify(payload), id] });
+        return send(res, 200, { ok: true });
       }
       // 主管編輯回報表範本
       if (pn === '/api/admin/template' && req.method === 'POST') {

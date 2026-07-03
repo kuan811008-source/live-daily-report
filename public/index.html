@@ -77,6 +77,22 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);
 .statebtns button.fail.on{background:var(--failBg);border-color:var(--fail);color:var(--fail)}
 .statebtns button.na.on{background:var(--naBg);border-color:var(--na);color:var(--na)}
 .numrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pctrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.slider{flex:1;min-width:150px;height:26px;accent-color:var(--done);cursor:pointer}
+.slider:disabled{accent-color:var(--na);opacity:.5}
+.pctval{font-weight:800;font-size:15px;min-width:56px;text-align:right}
+.pctval.done{color:var(--done)}.pctval.mid{color:var(--partial)}.pctval.zero{color:var(--fail)}.pctval.na{color:var(--muted)}
+.naBtn{font:inherit;font-size:12.5px;font-weight:700;border:1.5px solid var(--line);background:#fff;color:var(--muted);border-radius:9px;padding:7px 12px;cursor:pointer}
+.naBtn.on{background:var(--naBg);border-color:var(--na);color:var(--na)}
+.noterow{margin-top:7px}
+.noteToggle{font:inherit;font-size:12px;font-weight:700;border:none;background:none;color:var(--brand2);cursor:pointer;padding:2px 0}
+.noteToggle.has{color:var(--brand)}
+.noteArea{width:100%;min-height:64px;margin-top:5px;font:inherit;font-size:13px;border:1.5px solid var(--line);border-radius:9px;padding:8px;resize:vertical}
+.noteArea:focus{outline:none;border-color:var(--accent)}
+.ctask{border:1.5px solid var(--line);border-radius:12px;padding:10px;margin:8px 0;background:#fcfdff;position:relative}
+.ctask .del{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--fail);font-size:18px;cursor:pointer;line-height:1}
+.cinput{width:100%;font:inherit;font-size:14px;border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:6px}
+.cinput:focus{outline:none;border-color:var(--accent)}
 .numrow input{max-width:140px}
 .badge{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px}
 .badge.ok{background:var(--doneBg);color:var(--done)}
@@ -154,7 +170,7 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
   <div class="summary no-print">
     <div class="ring" id="ring"><b id="ringTxt">0%</b></div>
     <div class="sumstats">
-      <div class="stat"><span class="v" id="sDone">0/0</span><span class="k">勾選完成</span></div>
+      <div class="stat"><span class="v" id="sDone">0 項</span><span class="k">計分項目</span></div>
       <div class="stat"><span class="v" id="sNum">0/0</span><span class="k">數字達標</span></div>
       <div class="stat"><span class="v" id="sHelp">0</span><span class="k">互助事蹟</span></div>
     </div>
@@ -168,6 +184,14 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
   <div class="card">
     <h2><span class="tag">第一部分</span>每日工作勾選</h2>
     <div id="checklist"></div>
+  </div>
+
+  <!-- CUSTOM -->
+  <div class="card">
+    <h2><span class="tag">自訂</span>今日額外工作項目</h2>
+    <div class="hint">非直播日、或範本沒列到的當天工作，可自己新增（含完成度與備註）；會一併計入完成率。</div>
+    <div id="custom"></div>
+    <button class="btn ghost no-print" id="btnAddCustom">＋ 新增今日工作項目</button>
   </div>
 
   <!-- PART 2 -->
@@ -274,7 +298,7 @@ const LS="live-daily-report-v1";
 
 /* ============== STATE ============== */
 let S=blank();
-function blank(){return {pos:"運營",ip:"微糖",name:"",date:today(),live:true,items:{},helps:[],deds:[],supOpen:false};}
+function blank(){return {pos:"運營",ip:"微糖",name:"",date:today(),live:true,items:{},notes:{},custom:[],helps:[],deds:[],supOpen:false};}
 function today(){const d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate());}
 function p2(n){return (n<10?"0":"")+n;}
 function $(id){return document.getElementById(id);}
@@ -283,10 +307,20 @@ function el(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!=nu
 /* ============== RENDER ============== */
 function renderSeg(box,arr,cur,cls,cb){box.innerHTML="";arr.forEach(v=>{const b=el("button",v===cur?"on":"",v);b.onclick=()=>cb(v);box.appendChild(b);});}
 function renderMeta(){
-  renderSeg($("posSeg"),POS,S.pos,"",v=>{S.pos=v;S.items={};renderMeta();renderChecklist();renderSummary();});
+  renderSeg($("posSeg"),POS,S.pos,"",v=>{S.pos=v;S.items={};S.notes={};renderMeta();renderChecklist();renderSummary();});
   renderSeg($("ipSeg"),IPS,S.ip,"ip",v=>{S.ip=v;renderMeta();renderChecklist();renderSummary();});
   $("name").value=S.name;$("date").value=S.date;$("liveDay").checked=S.live;
 }
+function noteBlock(get,set){
+  const wrap=el("div","noterow");const cur=get()||"";
+  const btn=el("button","noteToggle"+(cur?" has":""),cur?"📝 備註（已填）":"＋ 備註");
+  const ta=el("textarea","noteArea");ta.placeholder="備註（可換行、選填）";ta.value=cur;ta.style.display=cur?"block":"none";
+  btn.onclick=()=>{ta.style.display=(ta.style.display==="none"?"block":"none");if(ta.style.display!=="none")ta.focus();};
+  ta.oninput=()=>{set(ta.value);btn.className="noteToggle"+(ta.value?" has":"");btn.textContent=ta.value?"📝 備註（已填）":"＋ 備註";};
+  wrap.append(btn,ta);return wrap;
+}
+function pctChip(){return el("span","pctval");}
+function paintPct(val,p,na){val.textContent=na?"不適用":p+"%";val.className="pctval "+(na?"na":p>=100?"done":p>0?"mid":"zero");}
 function renderChecklist(){
   const host=$("checklist");host.innerHTML="";
   const items=DATA[S.pos];const cats=[];items.forEach((it,i)=>{if(!cats.length||cats[cats.length-1].cat!==it[0])cats.push({cat:it[0],idx:[]});cats[cats.length-1].idx.push(i);});
@@ -303,11 +337,16 @@ function renderChecklist(){
       const it=items[i];const item=el("div","item");
       item.append(el("div","q",it[1]));
       if(it[3]==="c"){
-        item.append(el("div","std",it[2]&&it[2]!=="—"?"標準：<b>"+it[2]+"</b>":""));
-        const sb=el("div","statebtns");
-        STATES.forEach(([k,lab])=>{const b=el("button",k,lab);if(S.items[i]===k)b.classList.add("on");
-          b.onclick=()=>{S.items[i]=(S.items[i]===k?undefined:k);renderChecklist();renderSummary();};sb.appendChild(b);});
-        item.append(sb);
+        if(it[2]&&it[2]!=="—")item.append(el("div","std","標準：<b>"+it[2]+"</b>"));
+        const na=S.items[i]==="na";const pct=na?0:(typeof S.items[i]==="number"?S.items[i]:0);
+        const row=el("div","pctrow");
+        const sl=el("input");sl.type="range";sl.min="0";sl.max="100";sl.step="5";sl.value=pct;sl.className="slider";sl.disabled=na;
+        const val=pctChip();paintPct(val,pct,na);
+        sl.oninput=()=>{S.items[i]=Number(sl.value);paintPct(val,Number(sl.value),false);renderSummary();};
+        const naB=el("button","naBtn"+(na?" on":""),"不適用");
+        naB.onclick=()=>{S.items[i]=na?0:"na";renderChecklist();renderSummary();};
+        row.append(sl,val,naB);item.append(row);
+        item.append(noteBlock(()=>(S.notes||{})[i],v=>{if(!S.notes)S.notes={};S.notes[i]=v;}));
       } else {
         const thr=it[4][S.ip];
         item.append(el("div","std","門檻（"+S.ip+"）：<b>"+(thr>0?"≥ "+thr.toLocaleString():"—")+"</b>"));
@@ -315,38 +354,56 @@ function renderChecklist(){
         const inp=el("input");inp.type="number";inp.min="0";inp.placeholder="當日數量";inp.inputMode="numeric";
         if(S.items[i]!=null&&S.items[i]!=="")inp.value=S.items[i];
         const badge=el("span","badge idle","未填");
-        function upd(){const v=inp.value;if(v===""){S.items[i]="";badge.className="badge idle";badge.textContent="未填";}
-          else{S.items[i]=Number(v);const ok=thr<=0||Number(v)>=thr;badge.className="badge "+(ok?"ok":"no");badge.textContent=ok?"達標 ✓":"未達標";}renderSummary();}
-        inp.oninput=upd;row.append(inp,badge);item.append(row);
+        if(S.items[i]!=null&&S.items[i]!==""){const ok0=thr<=0||Number(S.items[i])>=thr;badge.className="badge "+(ok0?"ok":"no");badge.textContent=ok0?"達標 ✓":"未達標";}
+        inp.oninput=()=>{const v=inp.value;if(v===""){S.items[i]="";badge.className="badge idle";badge.textContent="未填";}else{S.items[i]=Number(v);const ok=thr<=0||Number(v)>=thr;badge.className="badge "+(ok?"ok":"no");badge.textContent=ok?"達標 ✓":"未達標";}renderSummary();};
+        row.append(inp,badge);item.append(row);
+        item.append(noteBlock(()=>(S.notes||{})[i],v=>{if(!S.notes)S.notes={};S.notes[i]=v;}));
       }
       body.appendChild(item);
     });
-    const sa=el("div","secact no-print");const all=el("button",null,"本節全部完成");
-    all.onclick=()=>{group.idx.forEach(i=>{if(items[i][3]==="c")S.items[i]="done";});renderChecklist();renderSummary();};
+    const sa=el("div","secact no-print");const all=el("button",null,"本節全部 100%");
+    all.onclick=()=>{group.idx.forEach(i=>{if(items[i][3]==="c"&&S.items[i]!=="na")S.items[i]=100;});renderChecklist();renderSummary();};
     sa.appendChild(all);body.appendChild(sa);
-    // mini progress
-    let dc=0,tc=0;group.idx.forEach(i=>{if(items[i][3]==="c"){tc++;if(S.items[i]==="done")dc++;}});
-    mini.textContent=tc?dc+"/"+tc:"";
+    let sum=0,n=0;group.idx.forEach(i=>{if(items[i][3]==="c"&&S.items[i]!=="na"){n++;sum+=(typeof S.items[i]==="number"?S.items[i]:0);}});
+    mini.textContent=n?Math.round(sum/n)+"%":"";
     sec.append(head,body);host.appendChild(sec);
   });
 }
 function calc(){
-  const items=DATA[S.pos];let done=0,part=0,na=0,cTot=0,nOk=0,nTot=0;
+  const items=DATA[S.pos];let sumP=0,cnt=0,na=0,cTot=0,nOk=0,nTot=0;
   items.forEach((it,i)=>{
-    if(it[3]==="c"){cTot++;const s=S.items[i];if(s==="done")done++;else if(s==="partial")part++;else if(s==="na")na++;}
+    if(it[3]==="c"){cTot++;const s=S.items[i];if(s==="na")na++;else{sumP+=(typeof s==="number"?s:0);cnt++;}}
     else{nTot++;const v=S.items[i];if(v!=null&&v!==""){const thr=it[4][S.ip];if(thr<=0||Number(v)>=thr)nOk++;}}
   });
-  const denom=cTot-na;const rate=denom>0?Math.round((done+0.5*part)/denom*100):0;
-  return {done,part,na,cTot,nOk,nTot,denom,rate};
+  (S.custom||[]).forEach(t=>{if(t.q&&t.q.trim()){sumP+=(Number(t.pct)||0);cnt++;}});
+  const rate=cnt>0?Math.round(sumP/cnt):0;
+  return {rate,cnt,na,cTot,nOk,nTot};
 }
 function renderSummary(){
   const c=calc();
   $("ringTxt").textContent=c.rate+"%";$("ring").style.setProperty("--p",c.rate);
-  $("sDone").textContent=c.done+"/"+c.denom;
+  $("sDone").textContent=c.cnt+" 項";
   $("sNum").textContent=c.nOk+"/"+c.nTot;
   $("sHelp").textContent=S.helps.length;
 }
 function ded(){let s=0;S.deds.forEach(d=>{s+=Number(d.pts||0);});return Math.max(-30,s);}
+/* ---- 自訂當日工作 ---- */
+function renderCustom(){
+  const host=$("custom");if(!host)return;host.innerHTML="";
+  (S.custom||[]).forEach((t,idx)=>{
+    const e=el("div","ctask");
+    const del=el("button","del","×");del.title="刪除";del.onclick=()=>{S.custom.splice(idx,1);renderCustom();renderSummary();};
+    const q=el("input","cinput");q.type="text";q.placeholder="工作項目名稱（例：整理倉庫出貨）";q.value=t.q||"";q.oninput=()=>{t.q=q.value;renderSummary();};
+    const row=el("div","pctrow");
+    const sl=el("input");sl.type="range";sl.min="0";sl.max="100";sl.step="5";sl.value=Number(t.pct)||0;sl.className="slider";
+    const val=pctChip();paintPct(val,Number(t.pct)||0,false);
+    sl.oninput=()=>{t.pct=Number(sl.value);paintPct(val,Number(sl.value),false);renderSummary();};
+    row.append(sl,val);
+    const ta=el("textarea","noteArea");ta.placeholder="備註（可換行、選填）";ta.value=t.note||"";ta.oninput=()=>{t.note=ta.value;};
+    e.append(del,q,row,ta);host.appendChild(e);
+  });
+}
+function addCustom(){if(!S.custom)S.custom=[];S.custom.push({q:"",pct:0,note:""});renderCustom();renderSummary();}
 
 /* ---- 互助 ---- */
 function renderHelps(){
@@ -424,16 +481,18 @@ function calcFor(r){const items=DATA[r.pos];let done=0,part=0,na=0,cTot=0;items.
 function syncInputs(){S.name=$("name").value;S.date=$("date").value;S.live=$("liveDay").checked;}
 function summaryText(){
   syncInputs();const c=calc();const items=DATA[S.pos];
-  const fails=[];items.forEach((it,i)=>{if(it[3]==="c"&&(S.items[i]==="fail"||S.items[i]==="partial"))fails.push(it[1].split("(")[0].slice(0,14)+(S.items[i]==="partial"?"(部分)":""));});
+  const low=[];items.forEach((it,i)=>{if(it[3]==="c"){const s=S.items[i];if(s!=="na"){const p=(typeof s==="number"?s:0);if(p<100)low.push(it[1].slice(0,14)+" "+p+"%");}}});
   const nums=[];items.forEach((it,i)=>{if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){const thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+" "+S.items[i]+(Number(S.items[i])>=thr||thr<=0?"✓":"✗"));}});
+  const noted=[];items.forEach((it,i)=>{const nt=(S.notes||{})[i];if(nt&&nt.trim())noted.push("・"+it[1].slice(0,12)+"："+nt.trim());});
+  const cust=(S.custom||[]).filter(t=>t.q&&t.q.trim());
   let t="【直播每日回報】"+S.pos+"｜"+(S.name||"—")+"｜"+S.date+(S.live?"（直播日）":"");
-  t+="\n完成率："+c.rate+"%（完成 "+c.done+"/"+c.denom+"）";
+  t+="\n平均完成度："+c.rate+"%（計分 "+c.cnt+" 項）";
   if(nums.length)t+="\n數字："+nums.join("、");
-  if(fails.length)t+="\n待補/未完成："+fails.join("、");
+  if(low.length)t+="\n未滿100%："+low.join("、");
+  if(cust.length){t+="\n──自訂當日工作──";cust.forEach(function(x){t+="\n・"+x.q.trim()+" "+(Number(x.pct)||0)+"%"+(x.note?"（"+x.note+"）":"");});}
+  if(noted.length)t+="\n──備註──\n"+noted.join("\n");
   if(S.helps.length){t+="\n──新人＆舊人 互助事蹟（"+S.helps.length+" 件）──";S.helps.forEach(function(x){var p=[];if(x.who)p.push("對象 "+x.who);if(x.content)p.push("內容 "+x.content);if(x.result)p.push("成效 "+x.result);t+="\n・"+(x.type||"")+(p.length?"｜"+p.join("｜"):"");});}
   else{t+="\n互助事蹟：無";}
-  var vd=S.deds.filter(function(x){return x.item;});
-  if(vd.length){t+="\n──主管扣分（合計 "+ded()+"）──";vd.forEach(function(x){t+="\n・"+x.item+(x.reason?"（"+x.reason+"）":"")+" "+(x.pts!=null?x.pts:"");});}
   return t;
 }
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
@@ -445,11 +504,12 @@ function loadJson(file){const r=new FileReader();r.onload=()=>{try{S=Object.assi
 /* ============== SERVER SUBMIT ============== */
 function buildPayload(){
  syncInputs();var c=calc();var items=DATA[S.pos];
- var fails=[];items.forEach(function(it,i){if(it[3]==="c"&&(S.items[i]==="fail"||S.items[i]==="partial"))fails.push(it[1].slice(0,18)+(S.items[i]==="partial"?"(部分)":""));});
+ var fails=[];items.forEach(function(it,i){if(it[3]==="c"){var s=S.items[i];if(s!=="na"){var p=(typeof s==="number"?s:0);if(p<100)fails.push(it[1].slice(0,16)+" "+p+"%");}}});
  var nums=[];items.forEach(function(it,i){if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){var thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+":"+S.items[i]+((thr<=0||Number(S.items[i])>=thr)?"✓":"✗"));}});
- var lines=items.map(function(it,i){var v;if(it[3]==="c"){v=({done:"完成",partial:"部分",fail:"未完成",na:"不適用"})[S.items[i]]||"未填";}else{var x=S.items[i];if(x==null||x===""){v="未填";}else{var thr=it[4][S.ip];v=x+((thr<=0||Number(x)>=thr)?" ✓達標":" ✗未達標");}}return {sec:it[0],q:it[1],v:v,t:it[3]};});
- return {pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,helps:S.helps,deds:S.deds,
-   metrics:{rate:c.rate,done:c.done,denom:c.denom,numOk:c.nOk,numTot:c.nTot,helpCount:S.helps.length,dedTotal:ded()},
+ var lines=items.map(function(it,i){var v;if(it[3]==="c"){var s=S.items[i];v=(s==="na")?"不適用":((typeof s==="number"?s:0)+"%");}else{var x=S.items[i];if(x==null||x===""){v="未填";}else{var thr=it[4][S.ip];v=x+((thr<=0||Number(x)>=thr)?" ✓達標":" ✗未達標");}}return {sec:it[0],q:it[1],v:v,t:it[3],note:((S.notes||{})[i]||"")};});
+ var custom=(S.custom||[]).filter(function(t){return t.q&&t.q.trim();}).map(function(t){return {q:t.q.trim(),pct:Number(t.pct)||0,note:t.note||""};});
+ return {pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,notes:S.notes,custom:custom,helps:S.helps,deds:S.deds,
+   metrics:{rate:c.rate,denom:c.cnt,cnt:c.cnt,numOk:c.nOk,numTot:c.nTot,helpCount:S.helps.length,dedTotal:ded()},
    fails:fails,nums:nums,lines:lines};
 }
 async function submitServer(){
@@ -466,15 +526,16 @@ async function submitServer(){
 }
 /* ============== BOOT ============== */
 function boot(keep){
-  renderMeta();renderChecklist();renderHelps();renderSummary();renderHistory();
+  renderMeta();renderChecklist();renderCustom();renderHelps();renderSummary();renderHistory();
 }
 function wire(){
   $("name").oninput=()=>{S.name=$("name").value;};
   $("date").onchange=()=>{S.date=$("date").value;renderHistory();};
   $("liveDay").onchange=()=>{S.live=$("liveDay").checked;};
-  $("btnAllDone").onclick=()=>{DATA[S.pos].forEach((it,i)=>{if(it[3]==="c")S.items[i]="done";});renderChecklist();renderSummary();toast("已全部標記完成");};
+  $("btnAllDone").onclick=()=>{DATA[S.pos].forEach((it,i)=>{if(it[3]==="c"&&S.items[i]!=="na")S.items[i]=100;});renderChecklist();renderSummary();toast("已全部設為 100%");};
   $("btnClear").onclick=()=>{if(confirm("清空今日這份表單？")){const k={pos:S.pos,ip:S.ip,name:S.name,date:S.date};S=Object.assign(blank(),k);boot(true);}};
   $("btnAddHelp").onclick=addHelp;
+  $("btnAddCustom").onclick=addCustom;
   $("btnSubmit").onclick=submitServer;
   $("btnSave").onclick=save;
   $("btnCopy").onclick=copy;

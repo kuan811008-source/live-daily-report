@@ -61,6 +61,12 @@ td.l,th.l{text-align:left}
 .dedrow input{font-size:12.5px;padding:6px 8px}
 .dedrow .rs{flex:1;min-width:130px}
 .dedx{background:none;border:none;color:var(--fail);cursor:pointer;font-size:18px;line-height:1}
+.dnote{display:block;font-size:11.5px;color:var(--brand2);margin-top:3px;white-space:pre-wrap}
+.rvrow{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.rvrow input{width:100px;font-size:13px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px}
+.rvl{font-size:12.5px;font-weight:700;color:var(--muted);margin-top:8px}
+.rvta{width:100%;min-height:52px;font:inherit;font-size:13px;border:1.5px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:4px;resize:vertical}
+.rvta:focus,.rvrow input:focus{outline:none;border-color:var(--accent)}
 .tpltabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
 .tpltab{font:inherit;font-size:13px;font-weight:700;border:1.5px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:6px 14px;cursor:pointer}
 .tpltab.on{background:var(--brand);border-color:var(--brand);color:#fff}
@@ -179,11 +185,11 @@ function renderSummary(sum){
   const t=$("sumTbl");
   if(!sum.length){t.innerHTML="<tr><td class='empty'>本月尚無資料</td></tr>";return;}
   sum.sort((a,b)=>(POS_ORDER[a.pos]-POS_ORDER[b.pos])||a.name.localeCompare(b.name));
-  let h="<tr><th class='l'>崗位</th><th class='l'>姓名</th><th>已填天數</th><th>平均每日完成率<br><span class='note'>軸一執行</span></th><th>互助件數<br><span class='note'>軸二互助</span></th><th>本月扣分合計<br><span class='note'>職責扣分</span></th></tr>";
+  let h="<tr><th class='l'>崗位</th><th class='l'>姓名</th><th>已填天數</th><th>平均每日完成率<br><span class='note'>軸一執行</span></th><th>互助件數<br><span class='note'>軸二互助</span></th><th>本月扣分合計<br><span class='note'>職責扣分</span></th><th>主管評分<br><span class='note'>月均</span></th></tr>";
   sum.forEach(s=>{
     h+="<tr><td class='l'><span class='pill'>"+s.pos+"</span></td><td class='l'>"+esc(s.name)+"</td><td>"+s.days+"</td>"+
        "<td class='rate "+(s.avgRate>=75?'good':s.avgRate<60?'bad':'')+"'>"+s.avgRate+"%</td>"+
-       "<td>"+s.helps+"</td><td class='ded'>"+(s.ded||0)+"</td></tr>";
+       "<td>"+s.helps+"</td><td class='ded'>"+(s.ded||0)+"</td><td class='rate "+(s.avgScore!=null&&s.avgScore>=75?'good':s.avgScore!=null&&s.avgScore<60?'bad':'')+"'>"+(s.avgScore!=null?s.avgScore:'—')+"</td></tr>";
   });
   t.innerHTML=h;
 }
@@ -214,13 +220,21 @@ function openDetail(id){
   h+="<div class='dmeta'><span>崗位：<b>"+esc(s.pos)+"</b></span><span>姓名：<b>"+esc(s.name)+"</b></span><span>IP：<b>"+esc(s.ip||'')+"</b></span><span>日期：<b>"+esc(s.date)+"</b></span><span>"+(s.live?'直播日':'非直播日')+"</span></div>";
   h+="<div class='dmeta'><span>完成率：<b>"+(m.denom>0?m.rate+'%':'—')+"</b></span><span>數字達標："+(m.numTot?m.numOk+'/'+m.numTot:'—')+"</span><span>互助："+(m.helpCount||0)+" 件</span><span>扣分："+(m.dedTotal||0)+"</span><span style='color:var(--muted)'>送出："+esc((s.receivedAt||'').replace('T',' ').slice(0,16))+"</span></div>";
   h+="<div class='dsec'><h3>第一部分　每日工作勾選</h3>";
-  if(s.lines&&s.lines.length){var lastSec=null;s.lines.forEach(function(ln){if(ln.sec!==lastSec){h+="<div class='dcat'>"+esc(ln.sec)+"</div>";lastSec=ln.sec;}var cls=ln.v==='完成'?'done':ln.v==='未完成'?'fail':ln.v==='部分'?'partial':ln.v==='不適用'?'na':ln.v==='未填'?'idle':(ln.v.indexOf('✓')>=0?'done':ln.v.indexOf('✗')>=0?'fail':'idle');h+="<div class='ditem'><span class='dq'>"+esc(ln.q)+"</span><span class='dv "+cls+"'>"+esc(ln.v)+"</span></div>";});}
+  if(s.lines&&s.lines.length){var lastSec=null;s.lines.forEach(function(ln){if(ln.sec!==lastSec){h+="<div class='dcat'>"+esc(ln.sec)+"</div>";lastSec=ln.sec;}var cls;if(ln.v==='不適用')cls='na';else if(ln.v==='未填')cls='idle';else if(ln.v.indexOf('%')>=0){var pn=parseInt(ln.v);cls=pn>=100?'done':pn>0?'partial':'fail';}else cls=ln.v.indexOf('✓')>=0?'done':ln.v.indexOf('✗')>=0?'fail':'idle';h+="<div class='ditem'><span class='dq'>"+esc(ln.q)+(ln.note?"<span class='dnote'>備註："+esc(ln.note)+"</span>":"")+"</span><span class='dv "+cls+"'>"+esc(ln.v)+"</span></div>";});}
   else{h+="<div class='ditem'><span class='dq'>未完成/部分項目</span><span>"+esc((s.fails||[]).join('、')||'（無）')+"</span></div>";if((s.nums||[]).length)h+="<div class='ditem'><span class='dq'>數字項</span><span>"+esc(s.nums.join('、'))+"</span></div>";h+="<div class='dempty'>（此筆為舊版資料，無逐項明細）</div>";}
   h+="</div>";
+  if((s.custom||[]).length){h+="<div class='dsec'><h3>自訂當日工作項目</h3>";s.custom.forEach(function(t){var p=Number(t.pct)||0;var c=p>=100?'done':p>0?'partial':'fail';h+="<div class='ditem'><span class='dq'>"+esc(t.q||'')+(t.note?"<span class='dnote'>備註："+esc(t.note)+"</span>":"")+"</span><span class='dv "+c+"'>"+p+"%</span></div>";});h+="</div>";}
   h+="<div class='dsec'><h3>第二部分　互助事蹟</h3>";
   if((s.helps||[]).length){s.helps.forEach(function(x){h+="<div class='dcard'><div class='t'>"+esc(x.type||'')+"</div>"+(x.who?"<div>對象/教學："+esc(x.who)+"</div>":"")+(x.content?"<div>內容："+esc(x.content)+"</div>":"")+(x.result?"<div>完成度/成效："+esc(x.result)+"</div>":"")+"</div>";});}else{h+="<div class='dempty'>（無）</div>";}
   h+="</div>";
   h+="<div class='dsec'><h3>第三部分　主管扣分（主管操作）</h3><div id='dedEditArea'></div></div>";
+  var rv=s.review||{};
+  h+="<div class='dsec'><h3>主管評分／回饋（主管操作）</h3>";
+  h+="<div class='rvrow'><span>主管評分（0–100）：</span><input id='rvScore' type='number' min='0' max='100' value=\""+esc(rv.score==null?'':String(rv.score))+"\"></div>";
+  h+="<div class='rvl'>亮點／做得好</div><textarea id='rvGood' class='rvta'>"+esc(rv.good||'')+"</textarea>";
+  h+="<div class='rvl'>待加強／提醒</div><textarea id='rvImprove' class='rvta'>"+esc(rv.improve||'')+"</textarea>";
+  h+="<div class='rvl'>主管總評／回饋</div><textarea id='rvComment' class='rvta'>"+esc(rv.comment||'')+"</textarea>";
+  h+="<button class='btn brand' style='margin-top:8px' onclick='saveReview()'>💾 儲存評分/回饋</button></div>";
   $("detailBody").innerHTML=h; $("detailModal").classList.add("show");
   editId=id; editDeds=JSON.parse(JSON.stringify(s.deds||[])); renderEditDeds();
 }
@@ -244,6 +258,11 @@ async function saveDeds(){
   var deds=editDeds.filter(function(d){return d.item;});
   var r=await fetch('/api/admin/deductions?id='+encodeURIComponent(editId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deds:deds})});
   if(r.ok){toast('扣分已儲存 ✓');var keep=editId;await load();if(subsById[keep])openDetail(keep);}else{toast('儲存失敗');}
+}
+async function saveReview(){
+  var body={score:$("rvScore").value,good:$("rvGood").value,improve:$("rvImprove").value,comment:$("rvComment").value};
+  var r=await fetch('/api/admin/review?id='+encodeURIComponent(editId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok){toast('評分/回饋已儲存 ✓');var keep=editId;await load();if(subsById[keep])openDetail(keep);}else{toast('儲存失敗');}
 }
 function closeDetail(){$("detailModal").classList.remove("show");}
 /* ===== 回報表範本編輯 ===== */
