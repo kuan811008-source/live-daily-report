@@ -175,12 +175,14 @@ const server = http.createServer(async (req, res) => {
         await db.execute({ sql: 'UPDATE submissions SET payload=? WHERE id=?', args: [JSON.stringify(payload), id] });
         return send(res, 200, { ok: true, dedTotal: payload.metrics.dedTotal });
       }
-      // 主管評分/回饋（每筆）
+      // 主管評分/回饋（每筆；回報送出後 24 小時自動鎖定，之後無法再編輯）
       if (pn === '/api/admin/review' && req.method === 'POST') {
         const id = u.searchParams.get('id');
         const b = await readBody(req);
-        const r = await db.execute({ sql: 'SELECT payload FROM submissions WHERE id=?', args: [id] });
+        const r = await db.execute({ sql: 'SELECT payload, received_at FROM submissions WHERE id=?', args: [id] });
         if (!r.rows.length) return send(res, 404, { error: '找不到該筆回報' });
+        if (Date.now() - new Date(r.rows[0].received_at).getTime() > 24 * 3600 * 1000)
+          return send(res, 403, { error: '此回報送出已超過 24 小時，主管評分/回饋已鎖定，無法再編輯。', locked: true });
         const payload = JSON.parse(r.rows[0].payload);
         payload.review = {
           score: (b.score === '' || b.score == null) ? null : Number(b.score),
