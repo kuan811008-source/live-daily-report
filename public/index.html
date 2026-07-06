@@ -151,18 +151,20 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
   <div class="card">
     <h2><span class="tag">基本</span>填寫人資訊</h2>
     <div class="grid meta">
+      <div class="fld">日別
+        <div class="seg" id="daySeg"></div>
+      </div>
       <div class="fld">崗位
         <div class="seg" id="posSeg"></div>
       </div>
-      <div class="fld">IP（決定數字門檻）
+      <div class="fld">IP（決定回報清單）
         <div class="seg ip" id="ipSeg"></div>
       </div>
       <label class="fld">姓名 <input type="text" id="name" placeholder="你的名字"></label>
       <label class="fld">日期 <input type="date" id="date"></label>
     </div>
-    <div style="margin-top:10px;display:flex;gap:18px;flex-wrap:wrap">
-      <label class="chk"><input type="checkbox" id="liveDay" checked>今天是直播日</label>
-      <span style="font-size:11.5px;color:var(--muted);align-self:center">非直播日的純直播項目，請選「不適用」</span>
+    <div style="margin-top:10px">
+      <span style="font-size:11.5px;color:var(--muted)">先選「日別 → 崗位 → IP」，系統會帶出對應的回報清單。</span>
     </div>
   </div>
 
@@ -285,6 +287,8 @@ let DATA={
  ["五、發貼文規範","連結放留言區不直接掛貼文(VIP私群/領100/24H火箭)","留言區","c"]
 ]
 };
+/* 相容：若硬編碼 DATA 仍是舊平面結構，前端就地升成兩層（與伺服器 migration 一致），確保 fetch 失敗時仍可用 */
+DATA=(function(d){ if(d && (d["直播日"]||d["非直播日"])) return d; var IPS=["微糖","白姊","棠棠"]; var out={"直播日":{},"非直播日":{}}; Object.keys(d||{}).forEach(function(role){ if(!Array.isArray(d[role]))return; out["直播日"][role]={}; out["非直播日"][role]={}; IPS.forEach(function(ip){ out["直播日"][role][ip]=d[role].map(function(it){ var tp=it[3]; if(tp==="n"){ var thr=(it[4]&&typeof it[4]==="object")?(Number(it[4][ip])||0):(Number(it[4])||0); return [it[0],it[1],it[2],"n",thr]; } return [it[0],it[1],it[2],(tp==="t"?"t":"s")]; }); out["非直播日"][role][ip]=JSON.parse(JSON.stringify(out["直播日"][role][ip])); }); }); return out; })(DATA);
 const HELP_TYPES=["①現場補位","②突發救場","③帶人育才","④跨部門協調","⑤直播後覆盤"];
 const HELP_HINT={
  "①現場補位":"協助對象／日期／內容／完成度",
@@ -298,7 +302,7 @@ const LS="live-daily-report-v1";
 
 /* ============== STATE ============== */
 let S=blank();
-function blank(){return {pos:"運營",ip:"微糖",name:"",date:today(),live:true,items:{},notes:{},custom:[],helps:[],deds:[],supOpen:false};}
+function blank(){return {day:"直播日",pos:"運營",ip:"微糖",name:"",date:today(),live:true,items:{},notes:{},custom:[],helps:[],deds:[],supOpen:false};}
 function today(){const d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate());}
 function p2(n){return (n<10?"0":"")+n;}
 function $(id){return document.getElementById(id);}
@@ -306,10 +310,13 @@ function el(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!=nu
 
 /* ============== RENDER ============== */
 function renderSeg(box,arr,cur,cls,cb){box.innerHTML="";arr.forEach(v=>{const b=el("button",v===cur?"on":"",v);b.onclick=()=>cb(v);box.appendChild(b);});}
+function curRoles(){return Object.keys(DATA[S.day]||{});}
+function curItems(){return (((DATA[S.day]||{})[S.pos]||{})[S.ip])||[];}
 function renderMeta(){
-  renderSeg($("posSeg"),POS,S.pos,"",v=>{S.pos=v;S.items={};S.notes={};renderMeta();renderChecklist();renderSummary();});
-  renderSeg($("ipSeg"),IPS,S.ip,"ip",v=>{S.ip=v;renderMeta();renderChecklist();renderSummary();});
-  $("name").value=S.name;$("date").value=S.date;$("liveDay").checked=S.live;
+  renderSeg($("daySeg"),["直播日","非直播日"],S.day,"",v=>{S.day=v;S.live=(v==="直播日");var r=curRoles();if(r.indexOf(S.pos)<0)S.pos=r[0]||"";S.items={};S.notes={};renderMeta();renderChecklist();renderSummary();});
+  renderSeg($("posSeg"),curRoles(),S.pos,"",v=>{S.pos=v;S.items={};S.notes={};renderMeta();renderChecklist();renderSummary();});
+  renderSeg($("ipSeg"),IPS,S.ip,"ip",v=>{S.ip=v;S.items={};S.notes={};renderMeta();renderChecklist();renderSummary();});
+  $("name").value=S.name;$("date").value=S.date;if($("liveDay"))$("liveDay").checked=S.live;
 }
 function noteBlock(get,set){
   const wrap=el("div","noterow");const cur=get()||"";
@@ -324,7 +331,7 @@ function paintPct(val,p,na){val.textContent=na?"不適用":p+"%";val.className="
 function pctOf(it,v){ if(it[3]==="n")return null; if(v==="na")return null; if(it[3]==="t")return ({done:100,partial:50,fail:0})[v]||0; return (typeof v==="number"?v:0); }
 function renderChecklist(){
   const host=$("checklist");host.innerHTML="";
-  const items=DATA[S.pos];const cats=[];items.forEach((it,i)=>{if(!cats.length||cats[cats.length-1].cat!==it[0])cats.push({cat:it[0],idx:[]});cats[cats.length-1].idx.push(i);});
+  const items=curItems();const cats=[];items.forEach((it,i)=>{if(!cats.length||cats[cats.length-1].cat!==it[0])cats.push({cat:it[0],idx:[]});cats[cats.length-1].idx.push(i);});
   cats.forEach(group=>{
     const sec=el("div","sec");
     const head=el("div","head");
@@ -339,7 +346,7 @@ function renderChecklist(){
       item.append(el("div","q",it[1]));
       const noteEl=()=>noteBlock(()=>(S.notes||{})[i],v=>{if(!S.notes)S.notes={};S.notes[i]=v;});
       if(it[3]==="n"){
-        const thr=it[4][S.ip];
+        const thr=it[4];
         item.append(el("div","std","門檻（"+S.ip+"）：<b>"+(thr>0?"≥ "+thr.toLocaleString():"—")+"</b>"));
         const row=el("div","numrow");
         const inp=el("input");inp.type="number";inp.min="0";inp.placeholder="當日數量";inp.inputMode="numeric";
@@ -375,9 +382,9 @@ function renderChecklist(){
   });
 }
 function calc(){
-  const items=DATA[S.pos];let sumP=0,cnt=0,na=0,cTot=0,nOk=0,nTot=0;
+  const items=curItems();let sumP=0,cnt=0,na=0,cTot=0,nOk=0,nTot=0;
   items.forEach((it,i)=>{
-    if(it[3]==="n"){nTot++;const v=S.items[i];if(v!=null&&v!==""){const thr=it[4][S.ip];if(thr<=0||Number(v)>=thr)nOk++;}}
+    if(it[3]==="n"){nTot++;const v=S.items[i];if(v!=null&&v!==""){const thr=it[4];if(thr<=0||Number(v)>=thr)nOk++;}}
     else{cTot++;const s=S.items[i];if(s==="na")na++;else{sumP+=pctOf(it,s);cnt++;}}
   });
   (S.custom||[]).forEach(t=>{if(t.q&&t.q.trim()){sumP+=(Number(t.pct)||0);cnt++;}});
@@ -483,14 +490,14 @@ function renderHistory(){
 function calcFor(r){const items=DATA[r.pos];let done=0,part=0,na=0,cTot=0;items.forEach((it,i)=>{if(it[3]==="c"){cTot++;const s=r.items[i];if(s==="done")done++;else if(s==="partial")part++;else if(s==="na")na++;}});const denom=cTot-na;return {denom,rate:denom>0?Math.round((done+0.5*part)/denom*100):0};}
 
 /* ============== EXPORT ============== */
-function syncInputs(){S.name=$("name").value;S.date=$("date").value;S.live=$("liveDay").checked;}
+function syncInputs(){S.name=$("name").value;S.date=$("date").value;}
 function summaryText(){
-  syncInputs();const c=calc();const items=DATA[S.pos];
+  syncInputs();const c=calc();const items=curItems();
   const low=[];items.forEach((it,i)=>{if(it[3]!=="n"){const s=S.items[i];if(s!=="na"){const p=pctOf(it,s);if(p<100)low.push(it[1].slice(0,14)+" "+p+"%");}}});
-  const nums=[];items.forEach((it,i)=>{if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){const thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+" "+S.items[i]+(Number(S.items[i])>=thr||thr<=0?"✓":"✗"));}});
+  const nums=[];items.forEach((it,i)=>{if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){const thr=it[4];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+" "+S.items[i]+(Number(S.items[i])>=thr||thr<=0?"✓":"✗"));}});
   const noted=[];items.forEach((it,i)=>{const nt=(S.notes||{})[i];if(nt&&nt.trim())noted.push("・"+it[1].slice(0,12)+"："+nt.trim());});
   const cust=(S.custom||[]).filter(t=>t.q&&t.q.trim());
-  let t="【直播每日回報】"+S.pos+"｜"+(S.name||"—")+"｜"+S.date+(S.live?"（直播日）":"");
+  let t="【直播每日回報】"+S.day+"｜"+S.pos+"｜"+(S.name||"—")+"｜"+S.date;
   t+="\n平均完成度："+c.rate+"%（計分 "+c.cnt+" 項）";
   if(nums.length)t+="\n數字："+nums.join("、");
   if(low.length)t+="\n未滿100%："+low.join("、");
@@ -508,12 +515,12 @@ function loadJson(file){const r=new FileReader();r.onload=()=>{try{S=Object.assi
 
 /* ============== SERVER SUBMIT ============== */
 function buildPayload(){
- syncInputs();var c=calc();var items=DATA[S.pos];
+ syncInputs();var c=calc();var items=curItems();
  var fails=[];items.forEach(function(it,i){if(it[3]!=="n"){var s=S.items[i];if(s!=="na"){var p=pctOf(it,s);if(p<100)fails.push(it[1].slice(0,16)+" "+p+"%");}}});
- var nums=[];items.forEach(function(it,i){if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){var thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+":"+S.items[i]+((thr<=0||Number(S.items[i])>=thr)?"✓":"✗"));}});
- var lines=items.map(function(it,i){var v;var s=S.items[i];if(it[3]==="n"){if(s==null||s===""){v="未填";}else{var thr=it[4][S.ip];v=s+((thr<=0||Number(s)>=thr)?" ✓達標":" ✗未達標");}}else if(it[3]==="t"){v=({done:"完成",partial:"部分",fail:"未完成",na:"不適用"})[s]||"未填";}else{v=(s==="na")?"不適用":((typeof s==="number"?s:0)+"%");}return {sec:it[0],q:it[1],v:v,t:it[3],note:((S.notes||{})[i]||"")};});
+ var nums=[];items.forEach(function(it,i){if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){var thr=it[4];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+":"+S.items[i]+((thr<=0||Number(S.items[i])>=thr)?"✓":"✗"));}});
+ var lines=items.map(function(it,i){var v;var s=S.items[i];if(it[3]==="n"){if(s==null||s===""){v="未填";}else{var thr=it[4];v=s+((thr<=0||Number(s)>=thr)?" ✓達標":" ✗未達標");}}else if(it[3]==="t"){v=({done:"完成",partial:"部分",fail:"未完成",na:"不適用"})[s]||"未填";}else{v=(s==="na")?"不適用":((typeof s==="number"?s:0)+"%");}return {sec:it[0],q:it[1],v:v,t:it[3],note:((S.notes||{})[i]||"")};});
  var custom=(S.custom||[]).filter(function(t){return t.q&&t.q.trim();}).map(function(t){return {q:t.q.trim(),pct:Number(t.pct)||0,note:t.note||""};});
- return {pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,notes:S.notes,custom:custom,helps:S.helps,deds:S.deds,
+ return {day:S.day,pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,notes:S.notes,custom:custom,helps:S.helps,deds:S.deds,
    metrics:{rate:c.rate,denom:c.cnt,cnt:c.cnt,numOk:c.nOk,numTot:c.nTot,helpCount:S.helps.length,dedTotal:ded()},
    fails:fails,nums:nums,lines:lines};
 }
@@ -536,8 +543,8 @@ function boot(keep){
 function wire(){
   $("name").oninput=()=>{S.name=$("name").value;};
   $("date").onchange=()=>{S.date=$("date").value;renderHistory();};
-  $("liveDay").onchange=()=>{S.live=$("liveDay").checked;};
-  $("btnAllDone").onclick=()=>{DATA[S.pos].forEach((it,i)=>{if(it[3]==="c"&&S.items[i]!=="na")S.items[i]=100;});renderChecklist();renderSummary();toast("已全部設為 100%");};
+  /* 日別由 daySeg 控制，S.live 隨之更新 */
+  $("btnAllDone").onclick=()=>{curItems().forEach((it,i)=>{if(it[3]==="n"||S.items[i]==="na")return;S.items[i]=(it[3]==="t")?"done":100;});renderChecklist();renderSummary();toast("已全部標記完成");};
   $("btnClear").onclick=()=>{if(confirm("清空今日這份表單？")){const k={pos:S.pos,ip:S.ip,name:S.name,date:S.date};S=Object.assign(blank(),k);boot(true);}};
   $("btnAddHelp").onclick=addHelp;
   $("btnAddCustom").onclick=addCustom;
@@ -549,7 +556,7 @@ function wire(){
   $("btnLoad").onclick=()=>$("fileIn").click();
   $("fileIn").onchange=e=>{if(e.target.files[0])loadJson(e.target.files[0]);};
 }
-function startApp(t){ if(t && (t["運營"]||t["小編"]||t["群控"])) DATA=t; wire(); boot(); }
+function startApp(t){ if(t && (t["直播日"]||t["非直播日"])) DATA=t; var r=curRoles(); if(r.indexOf(S.pos)<0)S.pos=r[0]||S.pos; wire(); boot(); }
 function loadTpl(n){ fetch('/api/template').then(function(r){return r.json();}).then(function(t){ startApp(t); }).catch(function(){ if(n>0){ setTimeout(function(){loadTpl(n-1);},1200); } else { startApp(null); } }); }
 loadTpl(3);
 </script>

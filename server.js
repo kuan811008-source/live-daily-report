@@ -37,6 +37,25 @@ async function initDB() {
     let def = '{}'; try { def = fs.readFileSync(TEMPLATE_FILE, 'utf8'); } catch (e) {}
     await db.execute({ sql: 'INSERT INTO config (key,value) VALUES (?,?)', args: ['template', def] });
   }
+  await migrateTemplate();
+}
+function migrateItems(arr, ip) {
+  return arr.map(it => {
+    const cat = it[0], q = it[1], std = it[2], type = it[3];
+    if (type === 'n') { const thr = (it[4] && typeof it[4] === 'object') ? (Number(it[4][ip]) || 0) : (Number(it[4]) || 0); return [cat, q, std, 'n', thr]; }
+    return [cat, q, std, (type === 't' ? 't' : 's')];
+  });
+}
+async function migrateTemplate() {
+  const r = await db.execute({ sql: 'SELECT value FROM config WHERE key=?', args: ['template'] });
+  if (!r.rows.length) return;
+  let t; try { t = JSON.parse(r.rows[0].value); } catch (e) { return; }
+  if (t['直播日'] || t['非直播日']) return; // 已是新結構
+  const IPS = ['微糖', '白姊', '棠棠']; const live = {};
+  for (const role of Object.keys(t)) { if (!Array.isArray(t[role])) continue; live[role] = {}; IPS.forEach(ip => { live[role][ip] = migrateItems(t[role], ip); }); }
+  const neo = { '直播日': live, '非直播日': JSON.parse(JSON.stringify(live)) };
+  await db.execute({ sql: 'INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', args: ['template', JSON.stringify(neo)] });
+  console.log('template migrated to 2-layer');
 }
 async function getTemplate() {
   const r = await db.execute({ sql: 'SELECT value FROM config WHERE key=?', args: ['template'] });
@@ -195,15 +214,7 @@ const server = http.createServer(async (req, res) => {
       if (pn === '/api/admin/template' && req.method === 'POST') {
         const b = await readBody(req);
         if (!b || typeof b !== 'object' || Array.isArray(b)) return send(res, 400, { error: '格式錯誤' });
-        const clean = {};
-        ['運營', '小編', '群控'].forEach(pos => {
-          if (Array.isArray(b[pos])) clean[pos] = b[pos].filter(it => Array.isArray(it) && String(it[1] || '').trim()).map(it => {
-            const cat = String(it[0] || ''); const q = String(it[1] || ''); const std = String(it[2] || ''); const type = it[3] === 'n' ? 'n' : (it[3] === 't' ? 't' : 's');
-            if (type === 'n') { const thr = it[4] || {}; return [cat, q, std, 'n', { '微糖': Number(thr['微糖']) || 0, '白姊': Number(thr['白姊']) || 0, '棠棠': Number(thr['棠棠']) || 0 }]; }
-            return [cat, q, std, type];
-          });
-        });
-        await db.execute({ sql: 'INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', args: ['template', JSON.stringify(clean)] });
+        await db.execute({ sql: 'INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', args: ['template', JSON.stringify(b)] });
         return send(res, 200, { ok: true });
       }
       if (pn === '/api/admin/export') {
