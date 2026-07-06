@@ -321,6 +321,7 @@ function noteBlock(get,set){
 }
 function pctChip(){return el("span","pctval");}
 function paintPct(val,p,na){val.textContent=na?"不適用":p+"%";val.className="pctval "+(na?"na":p>=100?"done":p>0?"mid":"zero");}
+function pctOf(it,v){ if(it[3]==="n")return null; if(v==="na")return null; if(it[3]==="t")return ({done:100,partial:50,fail:0})[v]||0; return (typeof v==="number"?v:0); }
 function renderChecklist(){
   const host=$("checklist");host.innerHTML="";
   const items=DATA[S.pos];const cats=[];items.forEach((it,i)=>{if(!cats.length||cats[cats.length-1].cat!==it[0])cats.push({cat:it[0],idx:[]});cats[cats.length-1].idx.push(i);});
@@ -336,18 +337,8 @@ function renderChecklist(){
     group.idx.forEach(i=>{
       const it=items[i];const item=el("div","item");
       item.append(el("div","q",it[1]));
-      if(it[3]==="c"){
-        if(it[2]&&it[2]!=="—")item.append(el("div","std","標準：<b>"+it[2]+"</b>"));
-        const na=S.items[i]==="na";const pct=na?0:(typeof S.items[i]==="number"?S.items[i]:0);
-        const row=el("div","pctrow");
-        const sl=el("input");sl.type="range";sl.min="0";sl.max="100";sl.step="5";sl.value=pct;sl.className="slider";sl.disabled=na;
-        const val=pctChip();paintPct(val,pct,na);
-        sl.oninput=()=>{S.items[i]=Number(sl.value);paintPct(val,Number(sl.value),false);renderSummary();};
-        const naB=el("button","naBtn"+(na?" on":""),"不適用");
-        naB.onclick=()=>{S.items[i]=na?0:"na";renderChecklist();renderSummary();};
-        row.append(sl,val,naB);item.append(row);
-        item.append(noteBlock(()=>(S.notes||{})[i],v=>{if(!S.notes)S.notes={};S.notes[i]=v;}));
-      } else {
+      const noteEl=()=>noteBlock(()=>(S.notes||{})[i],v=>{if(!S.notes)S.notes={};S.notes[i]=v;});
+      if(it[3]==="n"){
         const thr=it[4][S.ip];
         item.append(el("div","std","門檻（"+S.ip+"）：<b>"+(thr>0?"≥ "+thr.toLocaleString():"—")+"</b>"));
         const row=el("div","numrow");
@@ -356,15 +347,29 @@ function renderChecklist(){
         const badge=el("span","badge idle","未填");
         if(S.items[i]!=null&&S.items[i]!==""){const ok0=thr<=0||Number(S.items[i])>=thr;badge.className="badge "+(ok0?"ok":"no");badge.textContent=ok0?"達標 ✓":"未達標";}
         inp.oninput=()=>{const v=inp.value;if(v===""){S.items[i]="";badge.className="badge idle";badge.textContent="未填";}else{S.items[i]=Number(v);const ok=thr<=0||Number(v)>=thr;badge.className="badge "+(ok?"ok":"no");badge.textContent=ok?"達標 ✓":"未達標";}renderSummary();};
-        row.append(inp,badge);item.append(row);
-        item.append(noteBlock(()=>(S.notes||{})[i],v=>{if(!S.notes)S.notes={};S.notes[i]=v;}));
+        row.append(inp,badge);item.append(row);item.append(noteEl());
+      } else if(it[3]==="t"){
+        if(it[2]&&it[2]!=="—")item.append(el("div","std","標準：<b>"+it[2]+"</b>"));
+        const sb=el("div","statebtns");
+        STATES.forEach(function(kv){const b=el("button",kv[0],kv[1]);if(S.items[i]===kv[0])b.classList.add("on");b.onclick=()=>{S.items[i]=(S.items[i]===kv[0]?undefined:kv[0]);renderChecklist();renderSummary();};sb.appendChild(b);});
+        item.append(sb);item.append(noteEl());
+      } else {
+        if(it[2]&&it[2]!=="—")item.append(el("div","std","標準：<b>"+it[2]+"</b>"));
+        const na=S.items[i]==="na";const pct=na?0:(typeof S.items[i]==="number"?S.items[i]:0);
+        const row=el("div","pctrow");
+        const sl=el("input");sl.type="range";sl.min="0";sl.max="100";sl.step="5";sl.value=pct;sl.className="slider";sl.disabled=na;
+        const val=pctChip();paintPct(val,pct,na);
+        sl.oninput=()=>{S.items[i]=Number(sl.value);paintPct(val,Number(sl.value),false);renderSummary();};
+        const naB=el("button","naBtn"+(na?" on":""),"不適用");
+        naB.onclick=()=>{S.items[i]=na?0:"na";renderChecklist();renderSummary();};
+        row.append(sl,val,naB);item.append(row);item.append(noteEl());
       }
       body.appendChild(item);
     });
-    const sa=el("div","secact no-print");const all=el("button",null,"本節全部 100%");
-    all.onclick=()=>{group.idx.forEach(i=>{if(items[i][3]==="c"&&S.items[i]!=="na")S.items[i]=100;});renderChecklist();renderSummary();};
+    const sa=el("div","secact no-print");const all=el("button",null,"本節全部完成");
+    all.onclick=()=>{group.idx.forEach(i=>{const it=items[i];if(it[3]==="n"||S.items[i]==="na")return;S.items[i]=(it[3]==="t")?"done":100;});renderChecklist();renderSummary();};
     sa.appendChild(all);body.appendChild(sa);
-    let sum=0,n=0;group.idx.forEach(i=>{if(items[i][3]==="c"&&S.items[i]!=="na"){n++;sum+=(typeof S.items[i]==="number"?S.items[i]:0);}});
+    let sum=0,n=0;group.idx.forEach(i=>{const it=items[i];if(it[3]!=="n"&&S.items[i]!=="na"){n++;sum+=pctOf(it,S.items[i]);}});
     mini.textContent=n?Math.round(sum/n)+"%":"";
     sec.append(head,body);host.appendChild(sec);
   });
@@ -372,8 +377,8 @@ function renderChecklist(){
 function calc(){
   const items=DATA[S.pos];let sumP=0,cnt=0,na=0,cTot=0,nOk=0,nTot=0;
   items.forEach((it,i)=>{
-    if(it[3]==="c"){cTot++;const s=S.items[i];if(s==="na")na++;else{sumP+=(typeof s==="number"?s:0);cnt++;}}
-    else{nTot++;const v=S.items[i];if(v!=null&&v!==""){const thr=it[4][S.ip];if(thr<=0||Number(v)>=thr)nOk++;}}
+    if(it[3]==="n"){nTot++;const v=S.items[i];if(v!=null&&v!==""){const thr=it[4][S.ip];if(thr<=0||Number(v)>=thr)nOk++;}}
+    else{cTot++;const s=S.items[i];if(s==="na")na++;else{sumP+=pctOf(it,s);cnt++;}}
   });
   (S.custom||[]).forEach(t=>{if(t.q&&t.q.trim()){sumP+=(Number(t.pct)||0);cnt++;}});
   const rate=cnt>0?Math.round(sumP/cnt):0;
@@ -481,7 +486,7 @@ function calcFor(r){const items=DATA[r.pos];let done=0,part=0,na=0,cTot=0;items.
 function syncInputs(){S.name=$("name").value;S.date=$("date").value;S.live=$("liveDay").checked;}
 function summaryText(){
   syncInputs();const c=calc();const items=DATA[S.pos];
-  const low=[];items.forEach((it,i)=>{if(it[3]==="c"){const s=S.items[i];if(s!=="na"){const p=(typeof s==="number"?s:0);if(p<100)low.push(it[1].slice(0,14)+" "+p+"%");}}});
+  const low=[];items.forEach((it,i)=>{if(it[3]!=="n"){const s=S.items[i];if(s!=="na"){const p=pctOf(it,s);if(p<100)low.push(it[1].slice(0,14)+" "+p+"%");}}});
   const nums=[];items.forEach((it,i)=>{if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){const thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+" "+S.items[i]+(Number(S.items[i])>=thr||thr<=0?"✓":"✗"));}});
   const noted=[];items.forEach((it,i)=>{const nt=(S.notes||{})[i];if(nt&&nt.trim())noted.push("・"+it[1].slice(0,12)+"："+nt.trim());});
   const cust=(S.custom||[]).filter(t=>t.q&&t.q.trim());
@@ -504,9 +509,9 @@ function loadJson(file){const r=new FileReader();r.onload=()=>{try{S=Object.assi
 /* ============== SERVER SUBMIT ============== */
 function buildPayload(){
  syncInputs();var c=calc();var items=DATA[S.pos];
- var fails=[];items.forEach(function(it,i){if(it[3]==="c"){var s=S.items[i];if(s!=="na"){var p=(typeof s==="number"?s:0);if(p<100)fails.push(it[1].slice(0,16)+" "+p+"%");}}});
+ var fails=[];items.forEach(function(it,i){if(it[3]!=="n"){var s=S.items[i];if(s!=="na"){var p=pctOf(it,s);if(p<100)fails.push(it[1].slice(0,16)+" "+p+"%");}}});
  var nums=[];items.forEach(function(it,i){if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){var thr=it[4][S.ip];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+":"+S.items[i]+((thr<=0||Number(S.items[i])>=thr)?"✓":"✗"));}});
- var lines=items.map(function(it,i){var v;if(it[3]==="c"){var s=S.items[i];v=(s==="na")?"不適用":((typeof s==="number"?s:0)+"%");}else{var x=S.items[i];if(x==null||x===""){v="未填";}else{var thr=it[4][S.ip];v=x+((thr<=0||Number(x)>=thr)?" ✓達標":" ✗未達標");}}return {sec:it[0],q:it[1],v:v,t:it[3],note:((S.notes||{})[i]||"")};});
+ var lines=items.map(function(it,i){var v;var s=S.items[i];if(it[3]==="n"){if(s==null||s===""){v="未填";}else{var thr=it[4][S.ip];v=s+((thr<=0||Number(s)>=thr)?" ✓達標":" ✗未達標");}}else if(it[3]==="t"){v=({done:"完成",partial:"部分",fail:"未完成",na:"不適用"})[s]||"未填";}else{v=(s==="na")?"不適用":((typeof s==="number"?s:0)+"%");}return {sec:it[0],q:it[1],v:v,t:it[3],note:((S.notes||{})[i]||"")};});
  var custom=(S.custom||[]).filter(function(t){return t.q&&t.q.trim();}).map(function(t){return {q:t.q.trim(),pct:Number(t.pct)||0,note:t.note||""};});
  return {pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,notes:S.notes,custom:custom,helps:S.helps,deds:S.deds,
    metrics:{rate:c.rate,denom:c.cnt,cnt:c.cnt,numOk:c.nOk,numTot:c.nTot,helpCount:S.helps.length,dedTotal:ded()},

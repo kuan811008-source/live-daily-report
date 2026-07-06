@@ -198,9 +198,9 @@ const server = http.createServer(async (req, res) => {
         const clean = {};
         ['運營', '小編', '群控'].forEach(pos => {
           if (Array.isArray(b[pos])) clean[pos] = b[pos].filter(it => Array.isArray(it) && String(it[1] || '').trim()).map(it => {
-            const cat = String(it[0] || ''); const q = String(it[1] || ''); const std = String(it[2] || ''); const type = it[3] === 'n' ? 'n' : 'c';
+            const cat = String(it[0] || ''); const q = String(it[1] || ''); const std = String(it[2] || ''); const type = it[3] === 'n' ? 'n' : (it[3] === 't' ? 't' : 's');
             if (type === 'n') { const thr = it[4] || {}; return [cat, q, std, 'n', { '微糖': Number(thr['微糖']) || 0, '白姊': Number(thr['白姊']) || 0, '棠棠': Number(thr['棠棠']) || 0 }]; }
-            return [cat, q, std, 'c'];
+            return [cat, q, std, type];
           });
         });
         await db.execute({ sql: 'INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', args: ['template', JSON.stringify(clean)] });

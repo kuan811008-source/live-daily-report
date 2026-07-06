@@ -75,6 +75,9 @@ td.l,th.l{text-align:left}
 .tpltab.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .tplnote{font-size:12px;color:var(--muted);background:#f8fafc;border-left:3px solid var(--brand2);padding:7px 10px;border-radius:0 8px 8px 0;margin-bottom:10px}
 .tplitem{border:1.5px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;background:#fcfdff}
+.draghandle{cursor:grab;font-size:17px;color:var(--muted);padding:2px 6px;user-select:none;border:1.5px solid var(--line);border-radius:8px;background:#fff}
+.draghandle:active{cursor:grabbing}
+.tplitem.dragover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
 .tplr{display:flex;gap:6px;align-items:center;margin:5px 0;flex-wrap:wrap}
 .in{font:inherit;font-size:13px;background:#fff;border:1.5px solid var(--line);border-radius:8px;padding:7px 9px}
 .in:focus{outline:none;border-color:var(--accent)}
@@ -223,7 +226,7 @@ function openDetail(id){
   h+="<div class='dmeta'><span>崗位：<b>"+esc(s.pos)+"</b></span><span>姓名：<b>"+esc(s.name)+"</b></span><span>IP：<b>"+esc(s.ip||'')+"</b></span><span>日期：<b>"+esc(s.date)+"</b></span><span>"+(s.live?'直播日':'非直播日')+"</span></div>";
   h+="<div class='dmeta'><span>完成率：<b>"+(m.denom>0?m.rate+'%':'—')+"</b></span><span>數字達標："+(m.numTot?m.numOk+'/'+m.numTot:'—')+"</span><span>互助："+(m.helpCount||0)+" 件</span><span>扣分："+(m.dedTotal||0)+"</span><span style='color:var(--muted)'>送出："+esc((s.receivedAt||'').replace('T',' ').slice(0,16))+"</span></div>";
   h+="<div class='dsec'><h3>第一部分　每日工作勾選</h3>";
-  if(s.lines&&s.lines.length){var lastSec=null;s.lines.forEach(function(ln){if(ln.sec!==lastSec){h+="<div class='dcat'>"+esc(ln.sec)+"</div>";lastSec=ln.sec;}var cls;if(ln.v==='不適用')cls='na';else if(ln.v==='未填')cls='idle';else if(ln.v.indexOf('%')>=0){var pn=parseInt(ln.v);cls=pn>=100?'done':pn>0?'partial':'fail';}else cls=ln.v.indexOf('✓')>=0?'done':ln.v.indexOf('✗')>=0?'fail':'idle';h+="<div class='ditem'><span class='dq'>"+esc(ln.q)+(ln.note?"<span class='dnote'>備註："+esc(ln.note)+"</span>":"")+"</span><span class='dv "+cls+"'>"+esc(ln.v)+"</span></div>";});}
+  if(s.lines&&s.lines.length){var lastSec=null;s.lines.forEach(function(ln){if(ln.sec!==lastSec){h+="<div class='dcat'>"+esc(ln.sec)+"</div>";lastSec=ln.sec;}var cls;if(ln.v==='不適用')cls='na';else if(ln.v==='未填')cls='idle';else if(ln.v==='完成')cls='done';else if(ln.v==='部分')cls='partial';else if(ln.v==='未完成')cls='fail';else if(ln.v.indexOf('%')>=0){var pn=parseInt(ln.v);cls=pn>=100?'done':pn>0?'partial':'fail';}else cls=ln.v.indexOf('✓')>=0?'done':ln.v.indexOf('✗')>=0?'fail':'idle';h+="<div class='ditem'><span class='dq'>"+esc(ln.q)+(ln.note?"<span class='dnote'>備註："+esc(ln.note)+"</span>":"")+"</span><span class='dv "+cls+"'>"+esc(ln.v)+"</span></div>";});}
   else{h+="<div class='ditem'><span class='dq'>未完成/部分項目</span><span>"+esc((s.fails||[]).join('、')||'（無）')+"</span></div>";if((s.nums||[]).length)h+="<div class='ditem'><span class='dq'>數字項</span><span>"+esc(s.nums.join('、'))+"</span></div>";h+="<div class='dempty'>（此筆為舊版資料，無逐項明細）</div>";}
   h+="</div>";
   if((s.custom||[]).length){h+="<div class='dsec'><h3>自訂當日工作項目</h3>";s.custom.forEach(function(t){var p=Number(t.pct)||0;var c=p>=100?'done':p>0?'partial':'fail';h+="<div class='ditem'><span class='dq'>"+esc(t.q||'')+(t.note?"<span class='dnote'>備註："+esc(t.note)+"</span>":"")+"</span><span class='dv "+c+"'>"+p+"%</span></div>";});h+="</div>";}
@@ -297,15 +300,16 @@ function tplSetPos(p){tplPos=p;renderTpl();}
 function renderTpl(){
   var items=tpl[tplPos]||[];
   var tabs=['運營','小編','群控'].map(function(p){return "<button class='tpltab"+(p===tplPos?' on':'')+"' onclick=\"tplSetPos('"+p+"')\">"+p+"（"+(tpl[p]||[]).length+"）</button>";}).join('');
-  var h="<div class='tpltabs'>"+tabs+"</div><div class='tplnote'>「分類」相同的項目會自動歸成同一段（依此處上下順序）。類型選「數字」時可設各 IP 門檻（達標自動轉綠）。改完按下方「儲存」，填寫頁重新整理即生效。</div>";
+  var h="<div class='tpltabs'>"+tabs+"</div><div class='tplnote'>拖曳左上角 ⠿ 可排序（或用 ↑↓）。類型：<b>滑桿</b>＝0–100%、<b>四態</b>＝完成/部分/未完成/不適用、<b>數字</b>＝可設各 IP 門檻。「分類」相同會自動歸成同一段。改完按下方「儲存」，填寫頁重新整理即生效。</div>";
   items.forEach(function(it,i){
-    var isNum=it[3]==='n'; var thr=it[4]||{};
-    h+="<div class='tplitem'>";
-    h+="<div class='tplr'><input class='in' style='flex:1;min-width:140px' placeholder='分類（例：一、排期與規劃）' value=\""+esc(it[0]||'')+"\" oninput=\"tplUp("+i+",0,this.value)\">";
-    h+="<select class='in' onchange=\"tplType("+i+",this.value)\"><option value='c'"+(isNum?'':' selected')+">勾選</option><option value='n'"+(isNum?' selected':'')+">數字</option></select></div>";
+    var d=it[3]; var isN=(d==='n'); var isT=(d==='t'); var thr=it[4]||{};
+    h+="<div class='tplitem' ondragover='tplDragOver(event)' ondrop='tplDrop(event,"+i+")'>";
+    h+="<div class='tplr'><span class='draghandle' draggable='true' ondragstart='tplDragStart(event,"+i+")' title='拖曳排序'>⠿</span>";
+    h+="<input class='in' style='flex:1;min-width:110px' placeholder='分類（例：一、排期與規劃）' value=\""+esc(it[0]||'')+"\" oninput=\"tplUp("+i+",0,this.value)\">";
+    h+="<select class='in' onchange=\"tplType("+i+",this.value)\"><option value='s'"+((!isN&&!isT)?' selected':'')+">滑桿</option><option value='t'"+(isT?' selected':'')+">四態</option><option value='n'"+(isN?' selected':'')+">數字</option></select></div>";
     h+="<textarea class='in tqa' placeholder='工作項目內容' oninput=\"tplUp("+i+",1,this.value)\">"+esc(it[1]||'')+"</textarea>";
     h+="<div class='tplr'><input class='in' style='flex:1;min-width:140px' placeholder='標準/門檻說明（顯示用）' value=\""+esc(it[2]||'')+"\" oninput=\"tplUp("+i+",2,this.value)\"></div>";
-    if(isNum){ h+="<div class='tplr tthr'>門檻 微糖<input class='in num' type='number' value='"+(thr['微糖']||0)+"' oninput=\"tplThr("+i+",'微糖',this.value)\">白姊<input class='in num' type='number' value='"+(thr['白姊']||0)+"' oninput=\"tplThr("+i+",'白姊',this.value)\">棠棠<input class='in num' type='number' value='"+(thr['棠棠']||0)+"' oninput=\"tplThr("+i+",'棠棠',this.value)\"></div>"; }
+    if(isN){ h+="<div class='tplr tthr'>門檻 微糖<input class='in num' type='number' value='"+(thr['微糖']||0)+"' oninput=\"tplThr("+i+",'微糖',this.value)\">白姊<input class='in num' type='number' value='"+(thr['白姊']||0)+"' oninput=\"tplThr("+i+",'白姊',this.value)\">棠棠<input class='in num' type='number' value='"+(thr['棠棠']||0)+"' oninput=\"tplThr("+i+",'棠棠',this.value)\"></div>"; }
     h+="<div class='tplact'><button onclick='tplMove("+i+",-1)'>↑</button><button onclick='tplMove("+i+",1)'>↓</button><button class='rm' onclick='tplDel("+i+")'>✕ 移除</button></div></div>";
   });
   h+="<div style='margin-top:10px'><button class='btn ghost' onclick='tplAdd()'>＋ 新增項目</button></div>";
@@ -314,9 +318,13 @@ function renderTpl(){
 function tplUp(i,f,v){tpl[tplPos][i][f]=v;}
 function tplThr(i,ip,v){if(!tpl[tplPos][i][4])tpl[tplPos][i][4]={};tpl[tplPos][i][4][ip]=Number(v)||0;}
 function tplType(i,v){var it=tpl[tplPos][i];it[3]=v;if(v==='n'&&!it[4])it[4]={'微糖':0,'白姊':0,'棠棠':0};renderTpl();}
-function tplAdd(){var a=tpl[tplPos];a.push([a.length?a[a.length-1][0]:'一、',' ','','c']);a[a.length-1][1]='';renderTpl();}
+function tplAdd(){var a=tpl[tplPos];a.push([a.length?a[a.length-1][0]:'一、','','','s']);renderTpl();}
 function tplDel(i){if(confirm('移除這個項目？'))( tpl[tplPos].splice(i,1),renderTpl());}
 function tplMove(i,d){var a=tpl[tplPos],j=i+d;if(j<0||j>=a.length)return;var t=a[i];a[i]=a[j];a[j]=t;renderTpl();}
+var tplDragFrom=null;
+function tplDragStart(e,i){tplDragFrom=i;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text','')}catch(_){}}
+function tplDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';}
+function tplDrop(e,i){e.preventDefault();if(tplDragFrom==null||tplDragFrom===i){tplDragFrom=null;return;}var a=tpl[tplPos];var m=a.splice(tplDragFrom,1)[0];a.splice(i,0,m);tplDragFrom=null;renderTpl();}
 async function saveTpl(){
   var r=await fetch('/api/admin/template',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(tpl)});
   if(r.ok){toast('回報表已儲存 ✓ 填寫頁重新整理即生效');}else{toast('儲存失敗');}
