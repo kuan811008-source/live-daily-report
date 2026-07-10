@@ -337,14 +337,14 @@ function renderTpl(){
   if(tplPos)h+="<div class='tplnavrow'><span class='tplnavlbl'>IP</span>"+ipTabs+"</div>";
   h+="</div>";
   if(!tplPos){ h+="<div class='tplnote'>「"+tplDay+"」還沒有崗位，按上方「＋崗位」新增。直播日與非直播日的崗位可以完全不同。</div>"; $("tplBody").innerHTML=h; return; }
-  h+="<div class='tplnote'>拖曳左上角 ⠿ 可排序（或用 ↑↓）。類型：<b>滑桿</b>＝0–100%、<b>四態</b>＝完成/部分/未完成/不適用、<b>數字</b>＝設一個達標門檻。「分類」相同會自動歸成同一段。目前編輯的是「<b>"+esc(tplDay)+"／"+esc(tplPos)+"／"+esc(tplIp)+"</b>」專屬清單。</div>";
+  h+="<div class='tplnote'>拖曳左上角 ⠿ 可排序（或用 ↑↓）。類型：<b>滑桿</b>＝0–100%、<b>狀態鈕</b>＝可各自選 完成／未完成、完成／部分／未完成、或再＋不適用、<b>數字</b>＝設一個達標門檻。「分類」相同會自動歸成同一段。目前編輯的是「<b>"+esc(tplDay)+"／"+esc(tplPos)+"／"+esc(tplIp)+"</b>」專屬清單。</div>";
   h+="<div class='tplr' style='margin-bottom:8px'><button class='btn ghost sm' onclick='tplCopyToIps()'>複製此清單到其他 IP</button><button class='btn ghost sm' onclick='tplCopyToOtherDay()'>複製此崗位到另一日別</button></div>";
   curArr().forEach(function(it,i){
-    var d=it[3]; var isN=(d==='n'); var isT=(d==='t'); var thr=(typeof it[4]==='number')?it[4]:0;
+    var d=it[3]; var isN=(d==='n'); var isT=(d==='t'); var thr=(typeof it[4]==='number')?it[4]:0; var curType=isN?'n':(isT?('t'+(Number(it[4])||4)):'s');
     h+="<div class='tplitem' ondragover='tplDragOver(event)' ondrop='tplDrop(event,"+i+")'>";
     h+="<div class='tplr'><span class='draghandle' draggable='true' ondragstart='tplDragStart(event,"+i+")' title='拖曳排序'>⠿</span>";
     h+="<input class='in' style='flex:1;min-width:110px' placeholder='分類（例：一、排期與規劃）' value=\""+esc(it[0]||'')+"\" oninput=\"tplUp("+i+",0,this.value)\">";
-    h+="<select class='in' onchange=\"tplType("+i+",this.value)\"><option value='s'"+((!isN&&!isT)?' selected':'')+">滑桿</option><option value='t'"+(isT?' selected':'')+">四態</option><option value='n'"+(isN?' selected':'')+">數字</option></select></div>";
+    h+="<select class='in' onchange=\"tplType("+i+",this.value)\">";[['s','滑桿'],['t2','完成／未完成'],['t3','完成／部分／未完成'],['t4','完成／部分／未完成／不適用'],['n','數字']].forEach(function(o){h+="<option value='"+o[0]+"'"+(curType===o[0]?' selected':'')+">"+o[1]+"</option>";});h+="</select></div>";
     h+="<textarea class='in tqa' placeholder='工作項目內容' oninput=\"tplUp("+i+",1,this.value)\">"+esc(it[1]||'')+"</textarea>";
     h+="<div class='tplr'><input class='in' style='flex:1;min-width:140px' placeholder='標準/門檻說明（顯示用）' value=\""+esc(it[2]||'')+"\" oninput=\"tplUp("+i+",2,this.value)\"></div>";
     if(isN){ h+="<div class='tplr tthr'>達標門檻（數字）<input class='in num' type='number' value='"+thr+"' oninput=\"tplThr("+i+",this.value)\"></div>"; }
@@ -355,7 +355,7 @@ function renderTpl(){
 }
 function tplUp(i,f,v){curArr()[i][f]=v;}
 function tplThr(i,v){curArr()[i][4]=Number(v)||0;}
-function tplType(i,v){var it=curArr()[i];it[3]=v;if(v==='n'&&typeof it[4]!=='number')it[4]=0;renderTpl();}
+function tplType(i,v){var it=curArr()[i];var old=it[3];if(v.charAt(0)==='t'){it[3]='t';it[4]=Number(v.slice(1))||4;}else if(v==='n'){it[3]='n';if(old!=='n')it[4]=0;}else{it[3]='s';if(it.length>4)it.length=4;}renderTpl();}
 function tplAdd(){var a=curArr();a.push([a.length?a[a.length-1][0]:'一、','','','s']);renderTpl();}
 function tplDel(i){if(confirm('移除這個項目？')){curArr().splice(i,1);renderTpl();}}
 function tplMove(i,d){var a=curArr(),j=i+d;if(j<0||j>=a.length)return;var t=a[i];a[i]=a[j];a[j]=t;renderTpl();}

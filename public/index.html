@@ -329,6 +329,8 @@ function noteBlock(get,set){
 function pctChip(){return el("span","pctval");}
 function paintPct(val,p,na){val.textContent=na?"不適用":p+"%";val.className="pctval "+(na?"na":p>=100?"done":p>0?"mid":"zero");}
 function pctOf(it,v){ if(it[3]==="n")return null; if(v==="na")return null; if(it[3]==="t")return ({done:100,partial:50,fail:0})[v]||0; return (typeof v==="number"?v:0); }
+/* 狀態鈕每項可選 2/3/4 態：it[4]=2→完成/未完成、3→完成/部分/未完成、其餘(含未設)→完成/部分/未完成/不適用 */
+function stStates(it){ var m=(it[3]==="t")?(Number(it[4])||4):4; if(m===2)return [["done","完成"],["fail","未完成"]]; if(m===3)return [["done","完成"],["partial","部分"],["fail","未完成"]]; return STATES; }
 function renderChecklist(){
   const host=$("checklist");host.innerHTML="";
   const items=curItems();const cats=[];items.forEach((it,i)=>{if(!cats.length||cats[cats.length-1].cat!==it[0])cats.push({cat:it[0],idx:[]});cats[cats.length-1].idx.push(i);});
@@ -358,7 +360,8 @@ function renderChecklist(){
       } else if(it[3]==="t"){
         if(it[2]&&it[2]!=="—")item.append(el("div","std","標準：<b>"+it[2]+"</b>"));
         const sb=el("div","statebtns");
-        STATES.forEach(function(kv){const b=el("button",kv[0],kv[1]);if(S.items[i]===kv[0])b.classList.add("on");b.onclick=()=>{S.items[i]=(S.items[i]===kv[0]?undefined:kv[0]);renderChecklist();renderSummary();};sb.appendChild(b);});
+        const sts=stStates(it);const allow=sts.map(function(kv){return kv[0];});if(S.items[i]!=null&&allow.indexOf(S.items[i])<0)S.items[i]=undefined;
+        sts.forEach(function(kv){const b=el("button",kv[0],kv[1]);if(S.items[i]===kv[0])b.classList.add("on");b.onclick=()=>{S.items[i]=(S.items[i]===kv[0]?undefined:kv[0]);renderChecklist();renderSummary();};sb.appendChild(b);});
         item.append(sb);item.append(noteEl());
       } else {
         if(it[2]&&it[2]!=="—")item.append(el("div","std","標準：<b>"+it[2]+"</b>"));
