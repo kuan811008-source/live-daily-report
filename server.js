@@ -72,8 +72,10 @@ function send(res, code, obj, headers) {
 }
 function readBody(req) {
   return new Promise(resolve => {
-    let d = ''; req.on('data', c => { d += c; if (d.length > 2e6) req.destroy(); });
-    req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch (e) { resolve({}); } });
+    // 收集 Buffer chunk，最後一次整體 UTF-8 解碼；不可用 d += c（會在 chunk 邊界把中文字切成兩半 → �）
+    const chunks = []; let len = 0;
+    req.on('data', c => { chunks.push(c); len += c.length; if (len > 2e6) req.destroy(); });
+    req.on('end', () => { try { const s = Buffer.concat(chunks).toString('utf8'); resolve(s ? JSON.parse(s) : {}); } catch (e) { resolve({}); } });
   });
 }
 function cookies(req) {
