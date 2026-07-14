@@ -93,6 +93,11 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);
 .ctask .del{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--fail);font-size:18px;cursor:pointer;line-height:1}
 .cinput{width:100%;font:inherit;font-size:14px;border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:6px}
 .cinput:focus{outline:none;border-color:var(--accent)}
+.ctaskhead{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.ctaskhead .cinput{flex:1;min-width:130px;margin-bottom:0}
+.tSel{font:inherit;font-size:13px;font-weight:700;padding:7px 8px;border:1.5px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.ctaskctrl{margin:2px 0}
+.numlab{font-size:12px;color:var(--muted);align-self:center}
 .numrow input{max-width:140px}
 .badge{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px}
 .badge.ok{background:var(--doneBg);color:var(--done)}
@@ -191,9 +196,17 @@ details.hist summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--b
   <!-- CUSTOM -->
   <div class="card">
     <h2><span class="tag">自訂</span>今日額外工作項目</h2>
-    <div class="hint">非直播日、或範本沒列到的當天工作，可自己新增（含完成度與備註）；會一併計入完成率。</div>
+    <div class="hint">非直播日、或範本沒列到的當天工作，可自己新增（可選型態、完成度與備註）；會一併計入完成率。</div>
     <div id="custom"></div>
     <button class="btn ghost no-print" id="btnAddCustom">＋ 新增今日工作項目</button>
+  </div>
+
+  <!-- ASSIGNED -->
+  <div class="card">
+    <h2><span class="tag">指派</span>主管指派任務</h2>
+    <div class="hint">主管臨時指派、範本沒列到的任務可在這裡新增（型態、完成度與備註都可設）；會一併計入完成率。</div>
+    <div id="assigned"></div>
+    <button class="btn ghost no-print" id="btnAddAssigned">＋ 新增主管指派任務</button>
   </div>
 
   <!-- PART 2 -->
@@ -302,7 +315,7 @@ const LS="live-daily-report-v1";
 
 /* ============== STATE ============== */
 let S=blank();
-function blank(){return {day:"直播日",pos:"運營",ip:"微糖",name:"",date:today(),live:true,items:{},notes:{},custom:[],helps:[],deds:[],supOpen:false};}
+function blank(){return {day:"直播日",pos:"運營",ip:"微糖",name:"",date:today(),live:true,items:{},notes:{},custom:[],assigned:[],helps:[],deds:[],supOpen:false};}
 function today(){const d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate());}
 function p2(n){return (n<10?"0":"")+n;}
 function $(id){return document.getElementById(id);}
@@ -390,7 +403,7 @@ function calc(){
     if(it[3]==="n"){nTot++;const v=S.items[i];if(v!=null&&v!==""){const thr=it[4];if(thr<=0||Number(v)>=thr)nOk++;}}
     else{cTot++;const s=S.items[i];if(s==="na")na++;else{sumP+=pctOf(it,s);cnt++;}}
   });
-  (S.custom||[]).forEach(t=>{if(t.q&&t.q.trim()){sumP+=(Number(t.pct)||0);cnt++;}});
+  [].concat(S.custom||[],S.assigned||[]).forEach(t=>{const p=taskPct(t);if(p!=null){sumP+=p;cnt++;}});
   const rate=cnt>0?Math.round(sumP/cnt):0;
   return {rate,cnt,na,cTot,nOk,nTot};
 }
@@ -402,23 +415,53 @@ function renderSummary(){
   $("sHelp").textContent=S.helps.length;
 }
 function ded(){let s=0;S.deds.forEach(d=>{s+=Number(d.pts||0);});return Math.max(-30,s);}
-/* ---- 自訂當日工作 ---- */
-function renderCustom(){
-  const host=$("custom");if(!host)return;host.innerHTML="";
-  (S.custom||[]).forEach((t,idx)=>{
+/* ---- 自訂/指派 任務（型態可選 滑桿/2態/3態/4態/數字） ---- */
+function normTask(t){ if(t.disp===undefined)t.disp="s"; if(t.k===undefined)t.k=0; if(t.v===undefined)t.v=(typeof t.pct==="number"?t.pct:(t.disp==="s"?0:undefined)); return t; }
+function curTaskType(t){ var d=t.disp||"s"; if(d==="n")return "n"; if(d==="t")return "t"+(Number(t.k)||4); return "s"; }
+function setTaskType(t,val){ if(val.charAt(0)==="t"){t.disp="t";t.k=Number(val.slice(1))||4;t.v=undefined;} else if(val==="n"){t.disp="n";t.k=0;t.v="";} else {t.disp="s";t.k=0;t.v=Number(t.v)||0;} }
+function taskPct(t){ if(!t.q||!t.q.trim())return null; return pctOf([null,t.q,null,t.disp||"s",t.k], t.v); }
+function taskVtxt(t){ var d=t.disp||"s"; if(d==="n"){var thr=Number(t.k)||0; if(t.v===""||t.v==null)return "未填"; return t.v+((thr<=0||Number(t.v)>=thr)?" ✓達標":" ✗未達標");} if(d==="t")return ({done:"完成",partial:"部分",fail:"未完成",na:"不適用"})[t.v]||"未填"; return (t.v==="na")?"不適用":((typeof t.v==="number"?t.v:0)+"%"); }
+function renderTaskList(arr,hostId){
+  const host=$(hostId);if(!host)return;host.innerHTML="";
+  (arr||[]).forEach((t,idx)=>{
+    normTask(t);
     const e=el("div","ctask");
-    const del=el("button","del","×");del.title="刪除";del.onclick=()=>{S.custom.splice(idx,1);renderCustom();renderSummary();};
+    const del=el("button","del","×");del.title="刪除";del.onclick=()=>{arr.splice(idx,1);renderTaskList(arr,hostId);renderSummary();};
     const q=el("input","cinput");q.type="text";q.placeholder="工作項目名稱（例：整理倉庫出貨）";q.value=t.q||"";q.oninput=()=>{t.q=q.value;renderSummary();};
-    const row=el("div","pctrow");
-    const sl=el("input");sl.type="range";sl.min="0";sl.max="100";sl.step="5";sl.value=Number(t.pct)||0;sl.className="slider";
-    const val=pctChip();paintPct(val,Number(t.pct)||0,false);
-    sl.oninput=()=>{t.pct=Number(sl.value);paintPct(val,Number(sl.value),false);renderSummary();};
-    row.append(sl,val);
+    const sel=el("select","tSel");
+    [["s","滑桿"],["t2","完成／未完成"],["t3","完成／部分／未完成"],["t4","完成／部分／未完成／不適用"],["n","數字"]].forEach(function(o){var op=document.createElement("option");op.value=o[0];op.textContent=o[1];if(curTaskType(t)===o[0])op.selected=true;sel.appendChild(op);});
+    sel.onchange=()=>{setTaskType(t,sel.value);renderTaskList(arr,hostId);renderSummary();};
+    const head=el("div","ctaskhead");head.append(q,sel);
+    const ctrl=el("div","ctaskctrl");
+    const d=t.disp||"s";
+    if(d==="n"){
+      const row=el("div","pctrow");
+      const thrIn=el("input");thrIn.type="number";thrIn.className="in num";thrIn.placeholder="目標";thrIn.style.width="80px";thrIn.value=(t.k||t.k===0)?t.k:"";
+      const actIn=el("input");actIn.type="number";actIn.className="in num";actIn.placeholder="實際";actIn.style.width="80px";actIn.value=(t.v===""||t.v==null)?"":t.v;
+      const badge=el("span","badge idle","未填");
+      const upd=()=>{const thr=Number(t.k)||0;if(t.v===""||t.v==null){badge.className="badge idle";badge.textContent="未填";}else{const ok=thr<=0||Number(t.v)>=thr;badge.className="badge "+(ok?"ok":"no");badge.textContent=ok?"達標 ✓":"未達標";}};
+      thrIn.oninput=()=>{t.k=Number(thrIn.value)||0;upd();renderSummary();};
+      actIn.oninput=()=>{t.v=actIn.value===""?"":Number(actIn.value);upd();renderSummary();};
+      upd();row.append(el("span","numlab","目標"),thrIn,el("span","numlab","實際"),actIn,badge);ctrl.append(row);
+    } else if(d==="t"){
+      const sb=el("div","statebtns");
+      const sts=stStates([null,t.q,null,"t",t.k]);const allow=sts.map(function(kv){return kv[0];});if(t.v!=null&&allow.indexOf(t.v)<0)t.v=undefined;
+      sts.forEach(function(kv){const b=el("button",kv[0],kv[1]);if(t.v===kv[0])b.classList.add("on");b.onclick=()=>{t.v=(t.v===kv[0]?undefined:kv[0]);renderTaskList(arr,hostId);renderSummary();};sb.appendChild(b);});
+      ctrl.append(sb);
+    } else {
+      const row=el("div","pctrow");
+      const sl=el("input");sl.type="range";sl.min="0";sl.max="100";sl.step="5";sl.value=Number(t.v)||0;sl.className="slider";
+      const val=pctChip();paintPct(val,Number(t.v)||0,false);
+      sl.oninput=()=>{t.v=Number(sl.value);paintPct(val,Number(sl.value),false);renderSummary();};
+      row.append(sl,val);ctrl.append(row);
+    }
     const ta=el("textarea","noteArea");ta.placeholder="備註（可換行、選填）";ta.value=t.note||"";ta.oninput=()=>{t.note=ta.value;};
-    e.append(del,q,row,ta);host.appendChild(e);
+    e.append(del,head,ctrl,ta);host.appendChild(e);
   });
 }
-function addCustom(){if(!S.custom)S.custom=[];S.custom.push({q:"",pct:0,note:""});renderCustom();renderSummary();}
+function renderCustom(){ renderTaskList(S.custom,"custom"); renderTaskList(S.assigned,"assigned"); }
+function addCustom(){if(!S.custom)S.custom=[];S.custom.push({q:"",disp:"s",k:0,v:0,note:""});renderTaskList(S.custom,"custom");renderSummary();}
+function addAssigned(){if(!S.assigned)S.assigned=[];S.assigned.push({q:"",disp:"s",k:0,v:0,note:""});renderTaskList(S.assigned,"assigned");renderSummary();}
 
 /* ---- 互助 ---- */
 function renderHelps(){
@@ -500,11 +543,13 @@ function summaryText(){
   const nums=[];items.forEach((it,i)=>{if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){const thr=it[4];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+" "+S.items[i]+(Number(S.items[i])>=thr||thr<=0?"✓":"✗"));}});
   const noted=[];items.forEach((it,i)=>{const nt=(S.notes||{})[i];if(nt&&nt.trim())noted.push("・"+it[1].slice(0,12)+"："+nt.trim());});
   const cust=(S.custom||[]).filter(t=>t.q&&t.q.trim());
+  const asg=(S.assigned||[]).filter(t=>t.q&&t.q.trim());
   let t="【直播每日回報】"+S.day+"｜"+S.pos+"｜"+(S.name||"—")+"｜"+S.date;
   t+="\n平均完成度："+c.rate+"%（計分 "+c.cnt+" 項）";
   if(nums.length)t+="\n數字："+nums.join("、");
   if(low.length)t+="\n未滿100%："+low.join("、");
-  if(cust.length){t+="\n──自訂當日工作──";cust.forEach(function(x){t+="\n・"+x.q.trim()+" "+(Number(x.pct)||0)+"%"+(x.note?"（"+x.note+"）":"");});}
+  if(cust.length){t+="\n──今日額外工作──";cust.forEach(function(x){t+="\n・"+x.q.trim()+" "+taskVtxt(x)+(x.note?"（"+x.note+"）":"");});}
+  if(asg.length){t+="\n──主管指派任務──";asg.forEach(function(x){t+="\n・"+x.q.trim()+" "+taskVtxt(x)+(x.note?"（"+x.note+"）":"");});}
   if(noted.length)t+="\n──備註──\n"+noted.join("\n");
   if(S.helps.length){t+="\n──新人＆舊人 互助事蹟（"+S.helps.length+" 件）──";S.helps.forEach(function(x){var p=[];if(x.who)p.push("對象 "+x.who);if(x.content)p.push("內容 "+x.content);if(x.result)p.push("成效 "+x.result);t+="\n・"+(x.type||"")+(p.length?"｜"+p.join("｜"):"");});}
   else{t+="\n互助事蹟：無";}
@@ -522,8 +567,10 @@ function buildPayload(){
  var fails=[];items.forEach(function(it,i){if(it[3]!=="n"){var s=S.items[i];if(s!=="na"){var p=pctOf(it,s);if(p<100)fails.push(it[1].slice(0,16)+" "+p+"%");}}});
  var nums=[];items.forEach(function(it,i){if(it[3]==="n"&&S.items[i]!=null&&S.items[i]!==""){var thr=it[4];nums.push((it[1].includes("留言數")?"留言數":it[1].includes("反饋")?"反饋留言":"限動則數")+":"+S.items[i]+((thr<=0||Number(S.items[i])>=thr)?"✓":"✗"));}});
  var lines=items.map(function(it,i){var v;var s=S.items[i];if(it[3]==="n"){if(s==null||s===""){v="未填";}else{var thr=it[4];v=s+((thr<=0||Number(s)>=thr)?" ✓達標":" ✗未達標");}}else if(it[3]==="t"){v=({done:"完成",partial:"部分",fail:"未完成",na:"不適用"})[s]||"未填";}else{v=(s==="na")?"不適用":((typeof s==="number"?s:0)+"%");}return {sec:it[0],q:it[1],v:v,t:it[3],note:((S.notes||{})[i]||"")};});
- var custom=(S.custom||[]).filter(function(t){return t.q&&t.q.trim();}).map(function(t){return {q:t.q.trim(),pct:Number(t.pct)||0,note:t.note||""};});
- return {day:S.day,pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,notes:S.notes,custom:custom,helps:S.helps,deds:S.deds,
+ var serTasks=function(arr){return (arr||[]).filter(function(t){return t.q&&t.q.trim();}).map(function(t){var p=taskPct(t);return {q:t.q.trim(),disp:t.disp||"s",k:t.k,v:t.v,vtxt:taskVtxt(t),pct:(p==null?null:p),note:t.note||""};});};
+ var custom=serTasks(S.custom);
+ var assigned=serTasks(S.assigned);
+ return {day:S.day,pos:S.pos,ip:S.ip,name:(S.name||"").trim(),date:S.date,live:S.live,items:S.items,notes:S.notes,custom:custom,assigned:assigned,helps:S.helps,deds:S.deds,
    metrics:{rate:c.rate,denom:c.cnt,cnt:c.cnt,numOk:c.nOk,numTot:c.nTot,helpCount:S.helps.length,dedTotal:ded()},
    fails:fails,nums:nums,lines:lines};
 }
@@ -551,6 +598,7 @@ function wire(){
   $("btnClear").onclick=()=>{if(confirm("清空今日這份表單？")){const k={pos:S.pos,ip:S.ip,name:S.name,date:S.date};S=Object.assign(blank(),k);boot(true);}};
   $("btnAddHelp").onclick=addHelp;
   $("btnAddCustom").onclick=addCustom;
+  $("btnAddAssigned").onclick=addAssigned;
   $("btnSubmit").onclick=submitServer;
   $("btnSave").onclick=save;
   $("btnCopy").onclick=copy;
