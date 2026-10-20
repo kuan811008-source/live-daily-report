@@ -67,7 +67,8 @@ const sessions = new Set(); // in-memory admin tokens (reset on restart)
 
 /* ---------- helpers ---------- */
 function send(res, code, obj, headers) {
-  res.writeHead(code, Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, headers || {}));
+  // no-store：避免手機瀏覽器/in-app webview 快取 API 回應，重新整理拿到舊資料
+  res.writeHead(code, Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, headers || {}));
   res.end(typeof obj === 'string' ? obj : JSON.stringify(obj));
 }
 function readBody(req) {
@@ -126,7 +127,7 @@ function serveStatic(res, rel) {
   if (!p.startsWith(PUBLIC)) return send(res, 403, { error: 'forbidden' });
   fs.readFile(p, (e, d) => {
     if (e) return send(res, 404, { error: 'not found' });
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(p).toLowerCase()] || 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(p).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(d);
   });
 }
